@@ -795,18 +795,23 @@ def draw_shop():
             # Enhanced border
             pygame.draw.rect(screen, border_color, item_rect, 3, border_radius=10)
 
-            # Item content
-            text_x = 70
-            text_y = y_offset + 10
+            # Item content with proper alignment
+            left_margin = 70
+            text_y = y_offset + 5
 
-            # Rarity indicator
+            # Rarity indicator - top left
             rarity_surface = small_font.render(rarity_text, True, text_color)
-            screen.blit(rarity_surface, (text_x, text_y))
+            screen.blit(rarity_surface, (left_margin, text_y))
 
-            # Item name with cost
-            item_text = f"{item['name']} - {item['cost']} coins"
-            name_surface = small_font.render(item_text, True, text_color)
-            screen.blit(name_surface, (text_x, text_y + 20))
+            # Item name - second line, left aligned
+            name_surface = small_font.render(item['name'], True, text_color)
+            screen.blit(name_surface, (left_margin, text_y + 15))
+
+            # Item cost - third line, right aligned
+            cost_text = f"{item['cost']} coins"
+            cost_surface = small_font.render(cost_text, True, text_color)
+            cost_x = 50 + item_width - cost_surface.get_width() - 20  # Right aligned with margin
+            screen.blit(cost_surface, (cost_x, text_y + 30))
 
             # Highlight cursor on hover
             if is_hovering_item:
@@ -1392,6 +1397,7 @@ def purchase_item(index):
             bought_mercenaries.append(item)
         elif item["type"] == "new_hero":
             HEROES.append(item["hero"])
+        save_game()  # 🎯 CRITICAL: Save game immediately after purchase!
 
 def reset_game():
     global selected_hero, enemy, hero_buttons, ability_buttons, animation_frames, animation_button, damage_texts, game_state, save_flags
