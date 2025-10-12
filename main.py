@@ -61,45 +61,124 @@ def get_daily_shop_items():
     special_items = [
         {"name": "Unlock Rocket Ability (Mage)", "cost": 50, "purchased": False, "type": "ability", "hero": "Mage", "ability": {"name": "Rocket", "damage": 50, "mana": 30}},
         {"name": "Unlock Ice Blast Ability (Mage)", "cost": 40, "purchased": False, "type": "ability", "hero": "Mage", "ability": {"name": "Ice Blast", "damage": 35, "mana": 20}},
-        {"name": "Unlock Lighting Storm Ability (Mage)", "cost": 60, "purchased": False, "type": "ability", "hero": "Mage", "ability": {"name": "Lightning Storm", "damage": 65, "mana": 35}},
+        {"name": "Unlock Lightning Storm Ability (Mage)", "cost": 60, "purchased": False, "type": "ability", "hero": "Mage", "ability": {"name": "Lightning Storm", "damage": 65, "mana": 35}},
         {"name": "Unlock Fire Barrier Ability (Warrior)", "cost": 45, "purchased": False, "type": "ability", "hero": "Warrior", "ability": {"name": "Fire Barrier", "heal": 25, "mana": 20}},
         {"name": "Unlock Multi-Shot Ability (Archer)", "cost": 55, "purchased": False, "type": "ability", "hero": "Archer", "ability": {"name": "Multi-Shot", "damage": 45, "mana": 25}},
+        {"name": "Unlock Dragon Scales Ability (Warrior)", "cost": 70, "purchased": False, "type": "ability", "hero": "Warrior", "ability": {"name": "Dragon Scales", "heal": 40, "mana": 25}},
+        {"name": "Unlock Shadow Arrow Ability (Archer)", "cost": 65, "purchased": False, "type": "ability", "hero": "Archer", "ability": {"name": "Shadow Arrow", "damage": 55, "mana": 35}},
+        {"name": "Unlock Meteor Ability (Mage)", "cost": 75, "purchased": False, "type": "ability", "hero": "Mage", "ability": {"name": "Meteor", "damage": 80, "mana": 45}},
         {"name": "Buy Mercenary (reduces enemy damage)", "cost": 30, "purchased": False, "type": "mercenary"},
         {"name": "Buy Veteran Soldier (reduces enemy damage more)", "cost": 60, "purchased": False, "type": "mercenary"},
+        {"name": "Buy Elite Mercenary (much stronger!", "cost": 120, "purchased": False, "type": "mercenary"},
     ]
 
-    # Select 3 random special items for today
-    selected_special = random.sample(special_items, 3)
-    daily_items.extend(selected_special)
+    # Daily Epic Hero - changes every day
+    epic_heroes = [
+        {
+            "name": "Unlock Epic Hero: Ninja", "cost": 500, "purchased": False, "type": "new_hero", "hero": {
+                "name": "Ninja",
+                "color": (50, 50, 50),
+                "abilities": [
+                    {"name": "Stealth Strike", "damage": 45, "mana": 15},
+                    {"name": "Shuriken Barrage", "damage": 60, "mana": 30},
+                    {"name": "Shadow Clone", "damage": 35, "mana": 20}
+                ]
+            }
+        },
+        {
+            "name": "Unlock Epic Hero: Sorcerer", "cost": 500, "purchased": False, "type": "new_hero", "hero": {
+                "name": "Sorcerer",
+                "color": (138, 43, 226),
+                "abilities": [
+                    {"name": "Dark Magic", "damage": 55, "mana": 25},
+                    {"name": "Soul Drain", "damage": 40, "heal": 20, "mana": 35},
+                    {"name": "Arcane Explosion", "damage": 70, "mana": 40}
+                ]
+            }
+        },
+        {
+            "name": "Unlock Epic Hero: Valkyrie", "cost": 500, "purchased": False, "type": "new_hero", "hero": {
+                "name": "Valkyrie",
+                "color": (220, 20, 60),
+                "abilities": [
+                    {"name": "Spear of Destiny", "damage": 50, "mana": 20},
+                    {"name": "Divine Wind", "damage": 35, "heal": 25, "mana": 30},
+                    {"name": "Valkyrie Chant", "damage": 65, "mana": 35}
+                ]
+            }
+        },
+        {
+            "name": "Unlock Epic Hero: Summoner", "cost": 500, "purchased": False, "type": "new_hero", "hero": {
+                "name": "Summoner",
+                "color": (35, 107, 142),
+                "abilities": [
+                    {"name": "Spirit Wolf", "damage": 48, "mana": 18},
+                    {"name": "Elemental Avatar", "heal": 35, "mana": 28},
+                    {"name": "Ancient Phoenix", "damage": 75, "mana": 45}
+                ]
+            }
+        }
+    ]
 
-    # Occasionally add legendary items based on player progress
-    if current_level >= 5 and random.random() < 0.3:
-        legendary_items = [
-            {"name": "Unlock New Hero: Paladin", "cost": 100, "purchased": False, "type": "new_hero", "hero": {
-                "name": "Paladin",
+    # Daily Legendary Hero - changes every day
+    legendary_heroes = [
+        {
+            "name": "Unlock Legendary Hero: Dragon Lord", "cost": 1000, "purchased": False, "type": "new_hero", "hero": {
+                "name": "Dragon Lord",
+                "color": (255, 69, 0),
+                "abilities": [
+                    {"name": "Dragon Breath", "damage": 90, "mana": 40},
+                    {"name": "Scale Armor", "heal": 60, "mana": 30},
+                    {"name": "Divine Draconic Wrath", "damage": 130, "mana": 70}
+                ]
+            }
+        },
+        {
+            "name": "Unlock Legendary Hero: Archangel", "cost": 1000, "purchased": False, "type": "new_hero", "hero": {
+                "name": "Archangel",
                 "color": (255, 215, 0),
                 "abilities": [
-                    {"name": "Holy Strike", "damage": 25, "mana": 12},
-                    {"name": "Divine Shield", "heal": 20, "mana": 20},
-                    {"name": "Judgement", "damage": 40, "mana": 30}
+                    {"name": "Sacred Light", "damage": 85, "heal": 40, "mana": 35},
+                    {"name": "Divine Intervention", "heal": 80, "mana": 45},
+                    {"name": "Judgment Day", "damage": 125, "mana": 80}
                 ]
-            }}
-        ]
-        daily_items.extend(legendary_items[:1])
-
-    if current_level >= 8 and random.random() < 0.2:
-        ultimate_items = [
-            {"name": "Unlock Legendary Hero: Legend", "cost": 500, "purchased": False, "type": "new_hero", "hero": {
-                "name": "Legend",
-                "color": (255, 0, 255),
+            }
+        },
+        {
+            "name": "Unlock Legendary Hero: Death Knight", "cost": 1000, "purchased": False, "type": "new_hero", "hero": {
+                "name": "Death Knight",
+                "color": (105, 105, 105),
                 "abilities": [
-                    {"name": "Supernova", "damage": 100, "mana": 50},
-                    {"name": "Regeneration", "heal": 50, "mana": 30},
-                    {"name": "Divine Wrath", "damage": 150, "mana": 80}
+                    {"name": "Life Drain", "damage": 95, "heal": 35, "mana": 30},
+                    {"name": "Death Coil", "damage": 80, "mana": 40},
+                    {"name": "Army of the Dead", "damage": 120, "mana": 75}
                 ]
-            }}
-        ]
-        daily_items.extend(ultimate_items[:1])
+            }
+        },
+        {
+            "name": "Unlock Legendary Hero: Phoenix Rider", "cost": 1000, "purchased": False, "type": "new_hero", "hero": {
+                "name": "Phoenix Rider",
+                "color": (255, 140, 0),
+                "abilities": [
+                    {"name": "Immolation", "damage": 100, "heal": 30, "mana": 50},
+                    {"name": "Phoenix Fire", "damage": 110, "mana": 60},
+                    {"name": "Rebirth", "heal": 100, "mana": 80}
+                ]
+            }
+        }
+    ]
+
+    # Select 2 random special items for today (reduced to make room for heroes)
+    selected_special = random.sample(special_items, 2)
+    daily_items.extend(selected_special)
+
+    # Add daily Epic Hero
+    epic_index = random.randint(0, len(epic_heroes) - 1)
+    daily_items.append(epic_heroes[epic_index])
+
+    # Add daily Legendary Hero (different from Epic)
+    legendary_index = random.randint(0, len(legendary_heroes) - 1)
+    daily_items.append(legendary_heroes[legendary_index])
 
     return daily_items
 
@@ -301,8 +380,8 @@ def play_background_music(state):
             music_file = audio_files.get('menu_bgm', 'menu_music.ogg')
 
         if os.path.exists(music_file):
-            mixer.music.load(music_file)
-            mixer.music.play(-1)  # Loop indefinitely
+            pygame.mixer.music.load(music_file)
+            pygame.mixer.music.play(-1)  # Loop indefinitely
         else:
             # Fallback to enhanced procedural music generation
             generate_procedural_music(state)
@@ -444,22 +523,8 @@ def generate_procedural_music(state):
         sound.play(-1)  # Loop indefinitely
 
     except Exception as e:
-        # Absolute fallback - simple beep if everything fails
-        try:
-            # Create a simple continuous tone
-            sample_rate = 44100
-            frequency = 440  # A4 note
-            duration = 1.0
-
-            import numpy as np
-            t = np.linspace(0, duration, int(sample_rate * duration), False)
-            wave = np.sin(frequency * 2 * np.pi * t) * 0.1
-            wave_int16 = (wave * 32767).astype(np.int16)
-
-            simple_sound = pygame.mixer.Sound(wave_int16.tobytes())
-            simple_sound.play(-1)
-        except:
-            pass  # Completely silent if even the fallback fails
+        # Completely silent if music generation fails - no fallback beep
+        pass
 
 # Initialize background music for welcome screen
 play_background_music('welcome')
@@ -491,8 +556,22 @@ def draw_win():
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
     subtitle = small_font.render(f"Level {current_level} Completed! +30 Coins. Total: {coins}", True, WHITE)
     screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
-    again = small_font.render("Press R for next level or Q to quit", True, WHITE)
-    screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 250))
+    # Show current level and progress with visual indicators
+    level_display = f"LEVEL {current_level}/20"
+    level_display_text = small_font.render(level_display, True, WHITE)
+    screen.blit(level_display_text, (SCREEN_WIDTH//2 - level_display_text.get_width()//2, 210))
+
+    # Progress bar showing level progression
+    progress_width = 300
+    progress_height = 10
+    progress_x = SCREEN_WIDTH//2 - progress_width//2
+    progress_y = 225
+    pygame.draw.rect(screen, DARK_RED, (progress_x, progress_y, progress_width, progress_height))
+    filled_width = int(progress_width * (current_level / 20))
+    pygame.draw.rect(screen, GREEN, (progress_x, progress_y, filled_width, progress_height))
+
+    again = small_font.render("Press P for next level or Q to quit", True, WHITE)
+    screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 240))
 
 def draw_lose():
     if not save_flags['lose']:
@@ -532,22 +611,133 @@ def draw_tie():
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
     subtitle = small_font.render(f"Mana depleted! +15 Coins. Total: {coins}", True, WHITE)
     screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
-    again = small_font.render("Press R to retry level or Q to quit", True, WHITE)
+    again = small_font.render("Press P for next level, R to retry or Q to quit", True, WHITE)
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 250))
 
 def draw_shop():
-    screen.fill((100, 100, 100))
-    title = font.render("Shop", True, WHITE)
-    screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 50))
-    coins_text = small_font.render(f"Coins: {coins}", True, WHITE)
+    global animation_frames, hue_shift
+    # Animated rainbow background for shop
+    hue_shift += 0.02  # Faster for shop
+    if hue_shift > 1:
+        hue_shift = 0
+    # Rainbow effect: rotate through colors but brighter for shop
+    r = int(150 + 100 * abs(math.sin(2 * math.pi * hue_shift)))
+    g = int(100 + 150 * abs(math.sin(2 * math.pi * hue_shift + 2)))
+    b = int(200 + 50 * abs(math.sin(2 * math.pi * hue_shift + 4)))
+    screen.fill((r, g, b))
+
+    # Add some moving particles in shop for atmosphere
+    for i in range(10):
+        particle_x = int(SCREEN_WIDTH * abs(math.sin(hue_shift + i)) % SCREEN_WIDTH)
+        particle_y = int(SCREEN_HEIGHT * abs(math.cos(hue_shift * 2 + i)) % SCREEN_HEIGHT)
+        particle_size = 3 + int(math.sin(hue_shift * 3 + i * 0.5) * 2)
+        pygame.draw.circle(screen, WHITE + (50,), (particle_x, particle_y), particle_size)
+
+    # Epic shop title with glowing effects
+    glow_surface = pygame.Surface((SCREEN_WIDTH, 100))
+    glow_surface.fill((r, g, b))
+    glow_surface.set_alpha(100)
+
+    for glow_offset in range(5):
+        glow_surface.fill((r//2, g//2, b//2))
+        glow_surface.set_alpha(50 - glow_offset * 10)
+        screen.blit(glow_surface, (0 - glow_offset, 40 - glow_offset * 2))
+
+    title = font.render("EPIC SHOP", True, BLACK)
+    title_x = SCREEN_WIDTH//2 - title.get_width()//2
+    screen.blit(title, (title_x, 50))
+
+    # Epic coins display with animation
+    coins_text = small_font.render(f"💰 EPIC COINS: {coins} 💰", True, WHITE)
+    coins_bg = pygame.Surface((coins_text.get_width() + 40, coins_text.get_height() + 10))
+    coins_bg.fill(BLACK)
+    coins_bg.set_alpha(200)
+    screen.blit(coins_bg, (40, 65))
     screen.blit(coins_text, (50, 70))
+
+    # Shop items with enhanced visuals
     y_offset = 100
-    for item in shop_items:
+    item_height = 40
+    item_width = 600
+
+    for i, item in enumerate(shop_items):
         if not item["purchased"]:
-            text = small_font.render(f"{item['name']} - {item['cost']} coins", True, WHITE)
-            screen.blit(text, (50, y_offset))
-            y_offset += 30
-    return_text = small_font.render("Press B to go back", True, WHITE)
+            # Check mouse hover for items
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            item_rect = pygame.Rect(50, y_offset, item_width, item_height)
+            is_hovering_item = item_rect.collidepoint(mouse_x, mouse_y)
+
+            # Determine if item is legendary, epic, or normal
+            if item.get("cost", 0) >= 1000:
+                item_bg_color = (255, 215, 0)  # Legendary - Gold
+                border_color = (255, 69, 0)   # Red-Orange
+                text_color = BLACK
+                rarity_text = "⭐ LEGENDARY ⭐"
+            elif item.get("cost", 0) >= 500:
+                item_bg_color = (186, 85, 211)  # Epic - Medium Orchid
+                border_color = (138, 43, 226)   # Blue Violet
+                text_color = WHITE
+                rarity_text = "✨ EPIC ✨"
+            elif item.get("type") == "new_hero":
+                item_bg_color = (255, 105, 180)  # New Hero - Hot Pink
+                border_color = (220, 20, 60)     # Crimson
+                text_color = BLACK
+                rarity_text = "🗡️ HERO 🗡️"
+            else:
+                item_bg_color = (70, 130, 180)   # Normal - Steel Blue
+                border_color = (25, 25, 112)     # Midnight Blue
+                text_color = WHITE
+                rarity_text = "⬜ NORMAL ⬜"
+
+            # Animated pulsing for epic/legendary items
+            if item.get("cost", 0) >= 500:
+                pulse_factor = 1 + 0.2 * abs(math.sin(current_time * 0.005 + i))
+                final_bg = tuple(min(255, int(c * pulse_factor)) for c in item_bg_color)
+            else:
+                final_bg = item_bg_color
+
+            # Create item background with glow
+            pygame.draw.rect(screen, final_bg, item_rect, border_radius=10)
+
+            # Border and glow effects
+            for glow_level in range(3):
+                glow_rect = pygame.Rect(50 - glow_level, y_offset - glow_level,
+                                      item_width + glow_level * 2, item_height + glow_level * 2)
+                glow_alpha = 100 - glow_level * 30
+                glow_color = border_color + (glow_alpha,)
+                pygame.draw.rect(screen, glow_color, glow_rect, border_radius=10)
+
+            # Enhanced border
+            pygame.draw.rect(screen, border_color, item_rect, 3, border_radius=10)
+
+            # Item content
+            text_x = 70
+            text_y = y_offset + 10
+
+            # Rarity indicator
+            rarity_surface = small_font.render(rarity_text, True, text_color)
+            screen.blit(rarity_surface, (text_x, text_y))
+
+            # Item name with cost
+            item_text = f"{item['name']} - {item['cost']} coins"
+            name_surface = small_font.render(item_text, True, text_color)
+            screen.blit(name_surface, (text_x, text_y + 20))
+
+            # Highlight cursor on hover
+            if is_hovering_item:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+                # Add extra glow on hover
+                pygame.draw.rect(screen, WHITE + (100,), item_rect, 2, border_radius=10)
+
+            y_offset += item_height + 5  # Adjusted spacing
+
+    # Epic return text with glow
+    return_bg = pygame.Surface((300, 40))
+    return_bg.fill((150, 200, 255))
+    return_bg.set_alpha(150)
+    screen.blit(return_bg, (SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT - 50))
+
+    return_text = small_font.render("Press B to go back", True, BLACK)
     screen.blit(return_text, (SCREEN_WIDTH//2 - return_text.get_width()//2, SCREEN_HEIGHT - 50))
 
 def draw_welcome():
@@ -638,41 +828,97 @@ def draw_battle():
 
         if not can_use_any_ability:
             skip_button = pygame.Rect(600, SCREEN_HEIGHT - 90, 160, 80)  # Set skip button
-            # Draw skip button
+
+            # IMPORTANT: Check if SKIP button is being hovered/clicked DURING drawing
             mouse_x, mouse_y = pygame.mouse.get_pos()
             is_hovering_skip = skip_button.collidepoint(mouse_x, mouse_y)
-            skip_bg_color = (100, 100, 200) if is_hovering_skip else (70, 70, 150)
 
-            # Glow effect for skip button
-            for glow_offset in range(5):
-                glow_rect = pygame.Rect(600 - glow_offset, SCREEN_HEIGHT - 90 - glow_offset,
-                                      160 + glow_offset * 2, 80 + glow_offset * 2)
-                glow_color_alpha = skip_bg_color + (50 - glow_offset * 10,)
-                pygame.draw.rect(screen, glow_color_alpha, glow_rect, border_radius=8)
+            # Draw skip button with visual feedback
+            skip_bg_color = (150, 150, 255) if is_hovering_skip else (100, 100, 200)
+            missing_bg_color = tuple(max(0, c - 30) for c in skip_bg_color)  # Slightly darker for depth
 
+            # Multi-layer glowing border
+            for glow_layer in range(3):
+                glow_rect = pygame.Rect(600 - glow_layer, SCREEN_HEIGHT - 90 - glow_layer,
+                                      160 + glow_layer * 2, 80 + glow_layer * 2)
+                glow_alpha = 150 - glow_layer * 40
+                if glow_alpha > 0:
+                    pygame.draw.rect(screen, skip_bg_color + (glow_alpha,), glow_rect, border_radius=8)
+
+            # Main button fill
             pygame.draw.rect(screen, skip_bg_color, skip_button, border_radius=8)
-            pygame.draw.rect(screen, YELLOW if is_hovering_skip else WHITE, skip_button, 2, border_radius=8)
 
-            # Skip Turn text
-            skip_font = pygame.font.SysFont(None, 32) if is_hovering_skip else font
-            skip_text = skip_font.render("SKIP", True, WHITE)
-            skip_sub = skip_font.render("TURN", True, WHITE)
+            # Inner border for 3D effect
+            pygame.draw.rect(screen, missing_bg_color, skip_button, border_radius=8, width=1)
+            pygame.draw.rect(screen, skip_bg_color, skip_button, border_radius=8, width=3)
 
-            skip_text_x = 600 + 160//2 - skip_text.get_width()//2
-            skip_text_y = SCREEN_HEIGHT - 90 + 80//2 - (skip_text.get_height() + skip_sub.get_height())//2
+            # Highlighted border when hovering
+            if is_hovering_skip:
+                highlight_color = (255, 255, 100)  # Bright yellow highlight
+                pygame.draw.rect(screen, highlight_color, skip_button, border_radius=8, width=4)
 
-            # Shadow
-            for tx, ty in [(skip_text_x - 2, skip_text_y - 2), (skip_text_x + 2, skip_text_y - 2),
-                          (skip_text_x - 2, skip_text_y + 2), (skip_text_x + 2, skip_text_y + 2)]:
-                skip_shadow = skip_font.render("SKIP", True, (0,0,0,128)).convert_alpha()
-                skip_shadow.set_alpha(128)
-                screen.blit(skip_shadow, (tx, ty))
-                sub_shadow = skip_font.render("TURN", True, (0,0,0,128)).convert_alpha()
-                sub_shadow.set_alpha(128)
-                screen.blit(sub_shadow, (tx, ty + skip_text.get_height()))
+            # Enhanced text rendering with multiple effects
+            skip_font = pygame.font.SysFont(None, 36) if is_hovering_skip else pygame.font.SysFont(None, 32)
+            button_text = "SKIP" if is_hovering_skip else "SKIP"
+            sub_text = "TURN" if is_hovering_skip else "TURN"
 
-            screen.blit(skip_text, (skip_text_x, skip_text_y))
-            screen.blit(skip_sub, (skip_text_x, skip_text_y + skip_text.get_height()))
+            # Main text with drop shadow
+            text_x = 600 + 160//2
+            text_y = SCREEN_HEIGHT - 90 + 80//2
+
+            # Draw centered text with shadow effect
+            skip_text = skip_font.render(button_text, True, (255, 255, 255))
+            sub_text_render = skip_font.render(sub_text, True, (255, 255, 255))
+
+            # Adjust Y position for two-line text
+            total_height = skip_text.get_height() + sub_text_render.get_height() + 2
+            start_y = text_y - total_height // 2
+
+            # Draw main "SKIP" text
+            main_text_x = text_x - skip_text.get_width() // 2
+            main_text_y = start_y
+
+            # Shadow behind text
+            shadow_offset = 3
+            shadow = skip_font.render(button_text, True, (0, 0, 0, 180)).convert_alpha()
+            shadow.set_alpha(180)
+            screen.blit(shadow, (main_text_x + shadow_offset, main_text_y + shadow_offset))
+
+            # Glow effect for hovering
+            if is_hovering_skip:
+                glow = skip_font.render(button_text, True, (255, 255, 150)).convert_alpha()
+                glow.set_alpha(100)
+                for glow_x, glow_y in [(main_text_x-1, main_text_y), (main_text_x+1, main_text_y),
+                                      (main_text_x, main_text_y-1), (main_text_x, main_text_y+1)]:
+                    screen.blit(glow, (glow_x, glow_y))
+
+            # Main text
+            screen.blit(skip_text, (main_text_x, main_text_y))
+
+            # Draw "TURN" text below
+            sub_text_x = text_x - sub_text_render.get_width() // 2
+            sub_text_y = start_y + skip_text.get_height() + 2
+
+            # Shadow for "TURN"
+            sub_shadow = skip_font.render(sub_text, True, (0, 0, 0, 180)).convert_alpha()
+            sub_shadow.set_alpha(180)
+            screen.blit(sub_shadow, (sub_text_x + shadow_offset, sub_text_y + shadow_offset))
+
+            # Glow effect for "TURN" when hovering
+            if is_hovering_skip:
+                sub_glow = skip_font.render(sub_text, True, (255, 255, 150)).convert_alpha()
+                sub_glow.set_alpha(100)
+                for sub_glow_x, sub_glow_y in [(sub_text_x-1, sub_text_y), (sub_text_x+1, sub_text_y),
+                                              (sub_text_x, sub_text_y-1), (sub_text_x, sub_text_y+1)]:
+                    screen.blit(sub_glow, (sub_glow_x, sub_glow_y))
+
+            # Main "TURN" text
+            screen.blit(sub_text_render, (sub_text_x, sub_text_y))
+
+            # Dynamic cursor for SKIP button interaction
+            if is_hovering_skip:
+                pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
+
         else:
             skip_button = None  # Clear skip button if can use abilities
 
@@ -1079,7 +1325,10 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_d and not DEBUG_MODE:
+            # Common keys that work in any state
+            if event.key == pygame.K_q:
+                running = False
+            elif event.key == pygame.K_d and not DEBUG_MODE:
                 DEBUG_MODE = True
                 print("DEBUG MODE: ON")
             elif event.key == pygame.K_d and DEBUG_MODE:
@@ -1088,35 +1337,56 @@ while running:
             elif game_state == WELCOME:
                 game_state = SELECTION
                 load_game()
-        elif game_state == SELECTION and event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_s:
-                game_state = SHOP
-                play_background_music('shop')
-            elif event.key == pygame.K_b:
-                game_state = SELECTION
-        elif game_state == SHOP and event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_b:
-                game_state = SELECTION
-        elif game_state in [WIN, LOSE, TIE, FINAL_WIN] and event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_r:
-                if game_state == WIN:
+            elif game_state == SELECTION and event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_s:
+                    game_state = SHOP
+                    play_background_music('shop')
+                elif event.key == pygame.K_b:
+                    game_state = SELECTION
+            elif game_state == SHOP and event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_b:
+                    game_state = SELECTION
+            elif game_state == WIN and event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:
                     current_level += 1
                     coins += 30
-                elif game_state == TIE:
-                    coins += 15
-                elif game_state == LOSE:
-                    current_level = 1
-                elif game_state == FINAL_WIN:
-                    pass
-                reset_game()
-                if current_level > 20:
-                    game_state = FINAL_WIN
-                else:
-                    game_state = SELECTION
-                # Reset save flags after restart
-                save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
-            elif event.key == pygame.K_q:
-                running = False
+                    reset_game()
+                    if current_level > 20:
+                        game_state = FINAL_WIN
+                    else:
+                        game_state = SELECTION
+                    # Reset save flags after restart
+                    save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
+                elif event.key == pygame.K_r:
+                    reset_game()
+                    save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
+            elif game_state in [LOSE, TIE, FINAL_WIN] and event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_r:
+                    if game_state == WIN:
+                        current_level += 1
+                        coins += 30
+                    elif game_state == TIE:
+                        coins += 15
+                    elif game_state == LOSE:
+                        current_level = 1
+                    elif game_state == FINAL_WIN:
+                        pass
+                    reset_game()
+                    if current_level > 20:
+                        game_state = FINAL_WIN
+                    else:
+                        game_state = SELECTION
+                    # Reset save flags after restart
+                    save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
+                elif event.key == pygame.K_p and game_state == TIE:
+                    # Allow P key in TIE state for progression (but no rewards in tie)
+                    current_level += 1
+                    reset_game()
+                    if current_level > 20:
+                        game_state = FINAL_WIN
+                    else:
+                        game_state = SELECTION
+                    save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = pygame.mouse.get_pos()
             if game_state == SELECTION:
