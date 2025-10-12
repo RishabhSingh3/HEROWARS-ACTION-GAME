@@ -1557,14 +1557,17 @@ while running:
                                 damage_texts.append((small_font.render("Not enough mana!", True, RED), [400, 300], 60))
                             break
             elif game_state == SHOP:
-                # Shop item purchasing by mouse click
+                # Shop item purchasing by mouse click - FIXED coordinate system
                 y_offset = 100
+                item_height = 40
+                item_width = 600  # Match drawing function
                 for i, item in enumerate(shop_items):
                     if not item["purchased"]:
-                        text_rect = pygame.Rect(50, y_offset, 400, 30)
-                        if text_rect.collidepoint(mouse_x, mouse_y):
-                            purchase_item(i)
-                        y_offset += 30
+                        item_rect = pygame.Rect(50, y_offset, item_width, item_height)
+                        if item_rect.collidepoint(mouse_x, mouse_y):
+                            purchase_item(i)  # Debug info
+                            print(f"Clicked item {i}: {item['name']} - Cost: {item['cost']}, Player coins: {coins}")
+                        y_offset += item_height + 5  # Match drawing increment (40 + 5 = 45)
 
     # Enemy AI timing - ONLY trigger after player action
     if game_state == BATTLE and selected_hero is not None and enemy is not None and game_timer.waiting_for_enemy_turn:
@@ -1592,11 +1595,11 @@ while running:
         y_offset = 100
         for item in shop_items:
             if not item["purchased"]:
-                text_rect = pygame.Rect(50, y_offset, 400, 30)
+                text_rect = pygame.Rect(50, y_offset, item_width, item_height)
                 if text_rect.collidepoint(mouse_x, mouse_y):
                     hovering = True
                     break
-                y_offset += 30
+                y_offset += item_height + 5  # Match the increment used in drawing
 
     if hovering:
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
