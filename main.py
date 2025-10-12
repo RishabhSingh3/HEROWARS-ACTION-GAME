@@ -636,26 +636,17 @@ def draw_battle():
         # Check if player can't use any abilities due to mana
         can_use_any_ability = any(selected_hero.mana >= a.get("mana", 0) for a in selected_hero.abilities)
 
-        # If can't use any abilities, provide SKIP TURN option instead of auto-tie
         if not can_use_any_ability:
-            # Show Skip Turn button
-            box_width = 160
-            box_height = 80
-            button_y = SCREEN_HEIGHT - 90
-
-            # Skip button positioned to the right of abilities
-            skip_x = 10 + len(selected_hero.abilities) * (box_width + 10) + 20
-            skip_y = button_y
-            skip_button = pygame.Rect(skip_x, skip_y, box_width, box_height)
-
+            skip_button = pygame.Rect(600, SCREEN_HEIGHT - 90, 160, 80)  # Set skip button
             # Draw skip button
+            mouse_x, mouse_y = pygame.mouse.get_pos()
             is_hovering_skip = skip_button.collidepoint(mouse_x, mouse_y)
             skip_bg_color = (100, 100, 200) if is_hovering_skip else (70, 70, 150)
 
             # Glow effect for skip button
             for glow_offset in range(5):
-                glow_rect = pygame.Rect(skip_x - glow_offset, skip_y - glow_offset,
-                                      box_width + glow_offset * 2, box_height + glow_offset * 2)
+                glow_rect = pygame.Rect(600 - glow_offset, SCREEN_HEIGHT - 90 - glow_offset,
+                                      160 + glow_offset * 2, 80 + glow_offset * 2)
                 glow_color_alpha = skip_bg_color + (50 - glow_offset * 10,)
                 pygame.draw.rect(screen, glow_color_alpha, glow_rect, border_radius=8)
 
@@ -667,8 +658,8 @@ def draw_battle():
             skip_text = skip_font.render("SKIP", True, WHITE)
             skip_sub = skip_font.render("TURN", True, WHITE)
 
-            skip_text_x = skip_x + box_width//2 - skip_text.get_width()//2
-            skip_text_y = skip_y + box_height//2 - (skip_text.get_height() + skip_sub.get_height())//2
+            skip_text_x = 600 + 160//2 - skip_text.get_width()//2
+            skip_text_y = SCREEN_HEIGHT - 90 + 80//2 - (skip_text.get_height() + skip_sub.get_height())//2
 
             # Shadow
             for tx, ty in [(skip_text_x - 2, skip_text_y - 2), (skip_text_x + 2, skip_text_y - 2),
