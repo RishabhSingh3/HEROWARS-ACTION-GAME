@@ -1,12 +1,10 @@
 import pygame
-from pygame import mixer
 import random
 import json
 import os
 from datetime import datetime
 
 pygame.init()
-mixer.init()
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
@@ -20,6 +18,10 @@ RED = (255, 0, 0)
 BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 YELLOW = (255, 255, 0)
+DARK_RED = (139, 0, 0)
+DARK_BLUE = (0, 0, 139)
+
+import math
 
 # Fonts
 font = pygame.font.SysFont(None, 36)
@@ -35,6 +37,7 @@ SHOP = 5
 WELCOME = 6
 TIE = 7
 game_state = WELCOME
+DEBUG_MODE = False
 
 SAVE_FILE = 'game_save.json'
 
@@ -224,11 +227,56 @@ enemy = None
 
 hero_buttons = []
 ability_buttons = []
+skip_button = None
 
 # Animation
 animation_frames = 0
 animation_button = -1
 damage_texts = []
+damage_text_counter = 0
+
+# Enhanced Visual Effects
+particles = []
+screen_shake = 0
+fade_start = 0
+fade_duration = 1000
+brightness = 1.0
+hue_shift = 0.0
+
+class Particle:
+    def __init__(self, x, y, color, dx, dy, life=30):
+        self.x = x
+        self.y = y
+        self.color = color
+        self.dx = dx
+        self.dy = dy
+        self.life = life
+        self.size = random.randint(2, 6)
+
+    def update(self):
+        self.x += self.dx
+        self.y += self.dy
+        self.dy += 0.2  # gravity
+        self.dx *= 0.98  # friction
+        self.life -= 1
+        return self.life > 0
+
+    def draw(self, surface):
+        if self.life > 0:
+            alpha = min(255, self.life * 8)
+            color_with_alpha = tuple(list(self.color) + [alpha])
+            pygame.draw.circle(surface, color_with_alpha, (int(self.x), int(self.y)), self.size)
+
+# Timing for enemy AI
+class GameTimer:
+    def __init__(self):
+        self.last_enemy_turn = 0
+        self.ENEMY_TURN_DELAY = 1000  # 1 second in milliseconds
+        self.enemy_turn_count = 0
+        self.player_turn_count = 0
+        self.waiting_for_enemy_turn = False
+
+game_timer = GameTimer()
 
 # Background Audio System
 audio_files = {
@@ -256,49 +304,162 @@ def play_background_music(state):
             mixer.music.load(music_file)
             mixer.music.play(-1)  # Loop indefinitely
         else:
-            # Fallback to procedural tone generation
-            generate_fallback_music(state)
+            # Fallback to enhanced procedural music generation
+            generate_procedural_music(state)
     except:
         # If music fails, generate procedural fallback
-        generate_fallback_music(state)
+        generate_procedural_music(state)
 
-def generate_fallback_music(state):
-    """Generate basic procedural music if audio files don't exist"""
+def generate_procedural_music(state):
+    """Generate enhanced procedural music with melodies and chords"""
     try:
-        # Simple square wave tone generation for different states
-        sample_rate = 44100
-        duration = 2.0  # 2 seconds
-
-        if state == 'welcome':
-            frequency = 261.63  # C4
-        elif state == 'battle':
-            frequency = 392.00  # G4
-        elif state == 'win':
-            frequency = 523.25  # C5
-        elif state == 'lose':
-            frequency = 146.83  # D3
-        elif state == 'shop':
-            frequency = 293.66  # D4
-        else:
-            frequency = 220.00  # A3
-
-        # Create simple audio data using procedural generation
         import numpy as np
-        if 'np' in globals():
-            t = np.linspace(0, duration, int(sample_rate * duration), False)
-            wave = np.sin(frequency * 2 * np.pi * t) * 0.3
-            fade_out = np.linspace(1, 0, int(sample_rate * 0.5))
-            wave[-len(fade_out):] *= fade_out
 
-            # Create simple pygame mixer Sound
-            # For demo purposes, we'll just use pygame's built-in sound
-            pass
+        # Music parameters
+        sample_rate = 44100
+        bpm = 120
+        seconds_per_beat = 60.0 / bpm
+
+        # Different musical scales and progressions for different states
+        if state == 'welcome':
+            # Majestic welcome theme - A minor scale
+            root_note = 220.00  # A3
+            scale = [0, 2, 4, 5, 7, 9, 11, 12]  # A minor scale + octave
+            progression = [9, 11, 12, 11, 9, 7, 5, 4]  # Simple melody
+            harmony = [0, 4, 7]  # Am chord
+
+        elif state == 'battle':
+            # Intense battle theme - E minor scale
+            root_note = 164.81  # E3
+            scale = [0, 2, 4, 5, 7, 9, 11, 12]  # E minor
+            progression = [7, 9, 11, 12, 11, 9, 7, 5, 4, 2]  # Fast paced
+            harmony = [0, 3, 7]  # Em chord
+
+        elif state == 'win':
+            # Triumphant victory theme - C major scale
+            root_note = 261.63  # C4
+            scale = [0, 2, 4, 5, 7, 9, 11, 12]  # C major
+            progression = [4, 5, 7, 9, 11, 12, 11, 9, 7, 5, 4, 0]  # Rising then falling
+            harmony = [0, 4, 7]  # C chord
+
+        elif state == 'lose' or state == 'tie':
+            # Somber defeat theme - D minor scale
+            root_note = 146.83  # D3
+            scale = [0, 2, 3, 5, 7, 8, 10, 12]  # D minor
+            progression = [0, -3, -5, -7, -8, -10]  # Descending sadness
+            harmony = [0, 3, 7]  # Dm chord
+
+        elif state == 'shop':
+            # Peaceful shopping theme - F major scale
+            root_note = 174.61  # F3
+            scale = [0, 2, 4, 5, 7, 9, 11, 12]  # F major
+            progression = [9, 7, 5, 4, 2, 0, -2, -5]  # Gentle wandering
+            harmony = [0, 4, 7]  # F chord
         else:
-            # Fallback: no numpy, just continue with silence
-            pass
+            root_note = 220.00
+            scale = [0, 2, 4, 5, 7, 9, 11, 12]
+            progression = [4, 5, 7, 9, 11, 12]
+            harmony = [0, 4, 7]
 
-    except:
-        pass  # Silent fail if music generation fails
+        # Generate musical phrases
+        melody_duration = 8  # Number of notes
+        harmony_duration = 4  # Number of harmony changes
+
+        # Create melody line
+        melody_notes = [root_note * (2 ** (scale[note % len(scale)] / 12)) for note in progression]
+        melody_times = np.linspace(0, melody_duration * seconds_per_beat, len(melody_notes) * 100)
+        melody_wave = np.zeros_like(melody_times)
+
+        # Generate smooth melody
+        note_samples = len(melody_times) // len(melody_notes)
+        for i, note_freq in enumerate(melody_notes):
+            start_idx = i * note_samples
+            end_idx = min((i + 1) * note_samples, len(melody_times))
+
+            # ADSR envelope for each note
+            attack = 0.1 * note_samples
+            decay = 0.2 * note_samples
+            sustain = 0.7
+            release = 0.1 * note_samples
+
+            t_note = melody_times[start_idx:end_idx] - melody_times[start_idx]
+            envelope = np.ones(len(t_note)) * sustain
+
+            # Attack
+            attack_samples = int(min(attack, len(t_note) * 0.5))
+            if attack_samples > 0:
+                envelope[:attack_samples] = np.linspace(0, 1, attack_samples)
+
+            # Decay
+            decay_end = int(min(attack + decay, len(t_note) * 0.8))
+            if decay_end > attack:
+                envelope[int(attack):decay_end] = np.linspace(1, sustain, decay_end - int(attack))
+
+            # Release
+            release_start = max(0, len(t_note) - int(release))
+            if release_start < len(t_note):
+                envelope[release_start:] = np.linspace(envelope[release_start], 0, len(t_note) - release_start)
+
+            # Add vibrato for expressiveness
+            vibrato = 0.005 * np.sin(2 * np.pi * 5 * t_note)
+
+            # Mix waveforms for richer sound
+            wave1 = np.sin(2 * np.pi * note_freq * t_note * (1 + vibrato))
+            wave2 = 0.5 * np.sin(2 * np.pi * note_freq * 2 * t_note)  # Octave
+            wave3 = 0.25 * np.sin(2 * np.pi * note_freq * 3 * t_note)  # Fifth
+            wave = (wave1 + wave2 + wave3) * envelope * 0.3
+
+            melody_wave[start_idx:end_idx] += wave
+
+        # Create harmony/background track
+        harmony_notes = [root_note * (2 ** (harmony[i] / 12)) for i in range(len(harmony))]
+        harmony_times = np.linspace(0, melody_duration * seconds_per_beat, len(harmony_times))
+        harmony_wave = np.zeros_like(harmony_times)
+
+        harmony_samples = len(harmony_times) // len(harmony_notes)
+        for i, note_freq in enumerate(harmony_notes):
+            start_idx = i * harmony_samples
+            end_idx = min((i + 1) * harmony_samples, len(harmony_times))
+
+            t_note = harmony_times[start_idx:end_idx] - harmony_times[start_idx]
+            envelope = np.ones(len(t_note)) * 0.2  # Softer volume
+
+            wave = np.sin(2 * np.pi * note_freq * t_note) * envelope
+            harmony_wave[start_idx:end_idx] += wave
+
+        # Combine melody and harmony
+        final_wave = melody_wave + harmony_wave * 0.4
+
+        # Add some noise/reverb for texture
+        noise_factor = 0.01
+        reverb = np.convolve(final_wave, np.ones(500) / 500, mode='same')
+        final_wave = final_wave + reverb * noise_factor + np.random.normal(0, 0.001, len(final_wave))
+
+        # Create pygame sound and play
+        # Convert to 16-bit signed integer format
+        final_wave = (final_wave * 32767).astype(np.int16)
+
+        # Create a simple loop by repeating the melody
+        sound = pygame.mixer.Sound(final_wave.tobytes())
+        sound.play(-1)  # Loop indefinitely
+
+    except Exception as e:
+        # Absolute fallback - simple beep if everything fails
+        try:
+            # Create a simple continuous tone
+            sample_rate = 44100
+            frequency = 440  # A4 note
+            duration = 1.0
+
+            import numpy as np
+            t = np.linspace(0, duration, int(sample_rate * duration), False)
+            wave = np.sin(frequency * 2 * np.pi * t) * 0.1
+            wave_int16 = (wave * 32767).astype(np.int16)
+
+            simple_sound = pygame.mixer.Sound(wave_int16.tobytes())
+            simple_sound.play(-1)
+        except:
+            pass  # Completely silent if even the fallback fails
 
 # Initialize background music for welcome screen
 play_background_music('welcome')
@@ -321,7 +482,10 @@ def draw_hero_selection():
         screen.blit(text, (x, y))
 
 def draw_win():
-    play_background_music('win')
+    if not save_flags['win']:
+        play_background_music('win')
+        save_game()
+        save_flags['win'] = True
     screen.fill(BLACK)
     title = font.render("Victory!", True, GREEN)
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
@@ -329,9 +493,12 @@ def draw_win():
     screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
     again = small_font.render("Press R for next level or Q to quit", True, WHITE)
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 250))
-    save_game()
 
 def draw_lose():
+    if not save_flags['lose']:
+        play_background_music('lose')
+        save_game()
+        save_flags['lose'] = True
     screen.fill(BLACK)
     title = font.render("Defeat", True, RED)
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
@@ -339,9 +506,12 @@ def draw_lose():
     screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
     again = small_font.render("Press R to play again or Q to quit", True, WHITE)
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 250))
-    save_game()
 
 def draw_final_win():
+    if not save_flags['final_win']:
+        play_background_music('win')
+        save_game()
+        save_flags['final_win'] = True
     screen.fill(BLACK)
     title = font.render("All Levels Completed!", True, GREEN)
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
@@ -351,9 +521,12 @@ def draw_final_win():
     screen.blit(coins_text, (SCREEN_WIDTH//2 - coins_text.get_width()//2, 230))
     again = small_font.render("Press R for main menu or Q to quit", True, WHITE)
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 280))
-    save_game()
 
 def draw_tie():
+    if not save_flags['tie']:
+        play_background_music('lose')
+        save_game()
+        save_flags['tie'] = True
     screen.fill(BLACK)
     title = font.render("Tie!", True, YELLOW)
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
@@ -361,7 +534,6 @@ def draw_tie():
     screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
     again = small_font.render("Press R to retry level or Q to quit", True, WHITE)
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 250))
-    save_game()
 
 def draw_shop():
     screen.fill((100, 100, 100))
@@ -410,38 +582,349 @@ def draw_welcome():
             y += 25
 
 def draw_battle():
-    screen.fill(WHITE)
-    # Draw hero info
-    hero_text = font.render(f"{selected_hero.name} HP: {selected_hero.health} Mana: {selected_hero.mana}", True, selected_hero.color)
-    screen.blit(hero_text, (10, 10))
+    global animation_frames, damage_text_counter, hue_shift, screen_shake
+    # Dynamic background based on game state
+    if game_timer.waiting_for_enemy_turn:
+        bg_color = (30, 30, 50)  # Dark blue when waiting for enemy
+    else:
+        hue_shift += 0.01
+        if hue_shift > 1:
+            hue_shift = 0
+        # Rainbow effect: rotate through colors
+        r = int(128 + 127 * abs(math.sin(2 * math.pi * hue_shift)))
+        g = int(128 + 127 * abs(math.sin(2 * math.pi * hue_shift + 2)))
+        b = int(128 + 127 * abs(math.sin(2 * math.pi * hue_shift + 4)))
+        bg_color = (r, g, b)
 
-    # Draw enemy info
-    enemy_text = font.render(f"Enemy HP: {enemy.health} Mana: {enemy.mana}", True, RED)
-    screen.blit(enemy_text, (SCREEN_WIDTH//2 + 10, 10))
+    screen.fill(bg_color)
 
-    # Draw abilities
-    global ability_buttons
-    ability_buttons = []
-    for i, ability in enumerate(selected_hero.abilities):
-        color = GREEN if selected_hero.mana >= ability.get("mana", 0) else RED
-        text = small_font.render(f"{ability['name']} ({ability.get('mana', 0)} mana)", True, color)
-        x = 10 + i * 200
-        y = SCREEN_HEIGHT - 60
-        ability_buttons.append(pygame.Rect(x, y, text.get_width(), text.get_height()))
-        screen.blit(text, (x, y))
+    if DEBUG_MODE:
+        # Debug info at top left
+        debug_text = small_font.render(f"Lvl:{current_level} PT:{game_timer.player_turn_count} ET:{game_timer.enemy_turn_count} WT:{game_timer.waiting_for_enemy_turn}", True, WHITE)
+        screen.blit(debug_text, (10, 10))
+        hero_y = 30
+    else:
+        hero_y = 10
 
-    # Animation
-    if animation_frames > 0:
-        pygame.draw.circle(screen, selected_hero.color, (400, 300), animation_frames * 10)
-        animation_frames -= 1
+    if selected_hero is not None and enemy is not None:
+        # Draw hero info with glow effect
+        for offset in range(3):
+            glow_color = tuple(max(0, c - 50) for c in selected_hero.color)
+            glow_text = font.render(f"{selected_hero.name} HP: {selected_hero.health} Mana: {selected_hero.mana}", True, glow_color).convert_alpha()
+            glow_text.set_alpha(100 - offset * 30)
+            screen.blit(glow_text, (10 + offset, hero_y + offset))
 
-    # Damage texts
-    for text, pos, life in damage_texts:
-        pygame.draw.rect(screen, BLACK, (pos[0]-50, pos[1]-20, 100, 40))
-        screen.blit(text, pos)
-        life -= 1
+        hero_text = font.render(f"{selected_hero.name} HP: {selected_hero.health} Mana: {selected_hero.mana}", True, selected_hero.color)
+        screen.blit(hero_text, (10, hero_y))
 
-    damage_texts[:] = [(t, p, l) for t, p, l in damage_texts if l > 0]
+        # Draw enemy info with glow effect
+        for offset in range(3):
+            glow_color = tuple(max(0, c - 50) for c in RED)
+            glow_text = font.render(f"Enemy HP: {enemy.health} Mana: {enemy.mana}", True, glow_color).convert_alpha()
+            glow_text.set_alpha(100 - offset * 30)
+            screen.blit(glow_text, (SCREEN_WIDTH//2 + 10 + offset, 10 + offset))
+
+        enemy_text = font.render(f"Enemy HP: {enemy.health} Mana: {enemy.mana}", True, RED)
+        screen.blit(enemy_text, (SCREEN_WIDTH//2 + 10, 10))
+
+        # Draw abilities as BIG, HIGHLIGHTED buttons
+        global ability_buttons
+        global skip_button  # Add global for skip button
+        ability_buttons = []
+        mouse_x, mouse_y = pygame.mouse.get_pos()
+
+        # Check if player can't use any abilities due to mana
+        can_use_any_ability = any(selected_hero.mana >= a.get("mana", 0) for a in selected_hero.abilities)
+
+        # If can't use any abilities, provide SKIP TURN option instead of auto-tie
+        if not can_use_any_ability:
+            # Show Skip Turn button
+            box_width = 160
+            box_height = 80
+            button_y = SCREEN_HEIGHT - 90
+
+            # Skip button positioned to the right of abilities
+            skip_x = 10 + len(selected_hero.abilities) * (box_width + 10) + 20
+            skip_y = button_y
+            skip_button = pygame.Rect(skip_x, skip_y, box_width, box_height)
+
+            # Draw skip button
+            is_hovering_skip = skip_button.collidepoint(mouse_x, mouse_y)
+            skip_bg_color = (100, 100, 200) if is_hovering_skip else (70, 70, 150)
+
+            # Glow effect for skip button
+            for glow_offset in range(5):
+                glow_rect = pygame.Rect(skip_x - glow_offset, skip_y - glow_offset,
+                                      box_width + glow_offset * 2, box_height + glow_offset * 2)
+                glow_color_alpha = skip_bg_color + (50 - glow_offset * 10,)
+                pygame.draw.rect(screen, glow_color_alpha, glow_rect, border_radius=8)
+
+            pygame.draw.rect(screen, skip_bg_color, skip_button, border_radius=8)
+            pygame.draw.rect(screen, YELLOW if is_hovering_skip else WHITE, skip_button, 2, border_radius=8)
+
+            # Skip Turn text
+            skip_font = pygame.font.SysFont(None, 32) if is_hovering_skip else font
+            skip_text = skip_font.render("SKIP", True, WHITE)
+            skip_sub = skip_font.render("TURN", True, WHITE)
+
+            skip_text_x = skip_x + box_width//2 - skip_text.get_width()//2
+            skip_text_y = skip_y + box_height//2 - (skip_text.get_height() + skip_sub.get_height())//2
+
+            # Shadow
+            for tx, ty in [(skip_text_x - 2, skip_text_y - 2), (skip_text_x + 2, skip_text_y - 2),
+                          (skip_text_x - 2, skip_text_y + 2), (skip_text_x + 2, skip_text_y + 2)]:
+                skip_shadow = skip_font.render("SKIP", True, (0,0,0,128)).convert_alpha()
+                skip_shadow.set_alpha(128)
+                screen.blit(skip_shadow, (tx, ty))
+                sub_shadow = skip_font.render("TURN", True, (0,0,0,128)).convert_alpha()
+                sub_shadow.set_alpha(128)
+                screen.blit(sub_shadow, (tx, ty + skip_text.get_height()))
+
+            screen.blit(skip_text, (skip_text_x, skip_text_y))
+            screen.blit(skip_sub, (skip_text_x, skip_text_y + skip_text.get_height()))
+        else:
+            skip_button = None  # Clear skip button if can use abilities
+
+        # Ability box dimensions and positioning
+        box_width = 160
+        box_height = 80
+        button_y = SCREEN_HEIGHT - 90
+
+        for i, ability in enumerate(selected_hero.abilities):
+            x = 10 + i * (box_width + 10)  # Spacing between buttons
+            y = button_y
+
+            # Check if mouse is hovering over this ability
+            button_rect = pygame.Rect(x, y, box_width, box_height)
+            ability_buttons.append(button_rect)
+            is_hovering = button_rect.collidepoint(mouse_x, mouse_y)
+
+            # Dynamic colors based on state
+            has_mana = selected_hero.mana >= ability.get("mana", 0)
+            base_color = GREEN if has_mana else DARK_RED
+
+            # Enhanced background colors with pulsing
+            if is_hovering and has_mana:
+                bg_base = (50, 200, 50)  # Bright green hover
+                pulse_factor = 1.2 + 0.3 * math.sin(current_time * 0.01)
+            elif animation_button == i:
+                bg_base = (255, 255, 100)  # Yellow for selected
+                pulse_factor = 1.3
+            elif has_mana:
+                bg_base = (30, 120, 30)  # Normal available
+                pulse_factor = 1.0
+            else:
+                bg_base = (120, 30, 30)  # No mana available
+                pulse_factor = 1.0
+
+            # Pulsing background effect
+            bg_color = tuple(min(255, int(c * pulse_factor)) for c in bg_base)
+            bg_surface = pygame.Surface((box_width, box_height))
+            bg_surface.fill(bg_color)
+            bg_surface.set_alpha(200)
+
+            # Draw background with glow layers
+            for glow_offset in range(5):
+                glow_rect = pygame.Rect(x - glow_offset, y - glow_offset,
+                                      box_width + glow_offset * 2, box_height + glow_offset * 2)
+                glow_color_alpha = bg_color + (50 - glow_offset * 10,)
+                pygame.draw.rect(screen, glow_color_alpha, glow_rect, border_radius=8)
+
+            # Main button background
+            pygame.draw.rect(screen, bg_color, button_rect, border_radius=8)
+
+            # Border highlight
+            border_thickness = 4 if is_hovering else 2
+            border_color = YELLOW if is_hovering and has_mana else WHITE
+            pygame.draw.rect(screen, border_color, button_rect, border_thickness, border_radius=8)
+
+            # Large, colorful ability text
+            text_font = pygame.font.SysFont(None, 32) if is_hovering else font
+            ability_name = ability['name']
+            mana_cost = ability.get('mana', 0)
+
+            text_color = WHITE if is_hovering else (YELLOW if has_mana else DARK_RED)
+
+            # Split text into name and cost for better layout
+            name_text = text_font.render(ability_name, True, text_color)
+            cost_text = text_font.render(f"{mana_cost} mana", True, text_color)
+
+            # Center text in button
+            total_width = max(name_text.get_width(), cost_text.get_width())
+            start_x = x + (box_width - total_width) // 2
+            start_y = y + box_height // 2 - (name_text.get_height() + cost_text.get_height() + 5) // 2
+
+            # Draw name and cost with shadow/outline for better visibility
+            shadow_offset = 2
+            shadow_color = (0, 0, 0, 180)
+
+            # Text shadow/glow
+            for tx, ty in [(start_x - shadow_offset, start_y - shadow_offset),
+                          (start_x + shadow_offset, start_y - shadow_offset),
+                          (start_x - shadow_offset, start_y + shadow_offset),
+                          (start_x + shadow_offset, start_y + shadow_offset)]:
+                name_shadow = text_font.render(ability_name, True, shadow_color).convert_alpha()
+                name_shadow.set_alpha(128)
+                screen.blit(name_shadow, (tx, ty))
+                cost_shadow = text_font.render(f"{mana_cost} mana", True, shadow_color).convert_alpha()
+                cost_shadow.set_alpha(128)
+                screen.blit(cost_shadow, (tx, ty + name_text.get_height() + 5))
+
+            # Main text
+            screen.blit(name_text, (start_x, start_y))
+            screen.blit(cost_text, (start_x, start_y + name_text.get_height() + 5))
+
+            # Add special effects for certain abilities
+            is_powerful = ability_name in ["Lightning", "Charge", "Rapid Fire"]
+            is_early_ability = game_timer.player_turn_count < 3
+
+            if is_powerful and is_early_ability:
+                # Lock icon for powerful abilities in early turns
+                lock_text = text_font.render("LOCKED", True, RED)
+                lock_x = x + box_width//2 - lock_text.get_width()//2
+                lock_y = y + box_height - lock_text.get_height() - 5
+                screen.blit(lock_text, (lock_x, lock_y))
+
+                # Dim the button when locked
+                locked_overlay = pygame.Surface((box_width, box_height))
+                locked_overlay.fill((0, 0, 0))
+                locked_overlay.set_alpha(100)
+                screen.blit(locked_overlay, (x, y))
+
+        # Update and draw particles
+        particles[:] = [p for p in particles if p.update()]
+        for particle in particles:
+            particle.draw(screen)
+
+        # Enhanced battle animation
+        if animation_frames > 0:
+            # Screen shake effect
+            if animation_frames > 5:
+                screen_shake = random.randint(-5, 5)
+
+            # Central impact animation
+            center_x, center_y = SCREEN_WIDTH//2, SCREEN_HEIGHT//2
+
+            # Draw expanding circles with color gradients
+            for radius in range(0, animation_frames * 20, 10):
+                alpha = max(0, 255 - radius)
+                circle_color = tuple(list(selected_hero.color) + [alpha])
+                pygame.draw.circle(screen, circle_color, (center_x + screen_shake, center_y), radius, 3)
+
+            # Lightning effects for special attacks
+            if animation_button >= 2:  # Assuming powerful abilities are at indices 2+
+                for _ in range(5):
+                    start_x = random.randint(0, SCREEN_WIDTH)
+                    end_x = random.randint(0, SCREEN_WIDTH)
+                    lightning_color = YELLOW if random.random() > 0.5 else WHITE
+                    pygame.draw.line(screen, lightning_color, (start_x, 0), (end_x, SCREEN_HEIGHT), 2)
+
+            animation_frames -= 1
+            if animation_frames <= 0:
+                screen_shake = 0
+        else:
+            screen_shake = 0
+
+        # Animated damage texts with particle trails
+        filtered_texts = []
+        y_offset = 50
+        for text, pos, life in damage_texts:
+            if life > 0:
+                # Pulse effect
+                if life > 50:
+                    pulse = 1.0
+                else:
+                    pulse = 1.0 + 0.3 * abs(math.sin(2 * math.pi * (60 - life) / 60))
+
+                # Create temporary surface for pulsing
+                pulse_text = pygame.transform.smoothscale(text,
+                    (int(text.get_width() * pulse), int(text.get_height() * pulse)))
+
+                # Rainbow color cycling for text
+                text_hue = (hue_shift * 360 + life * 10) % 360
+                r = int(128 + 127 * math.sin(math.radians(text_hue)))
+                g = int(128 + 127 * math.sin(math.radians(text_hue + 120)))
+                b = int(128 + 127 * math.sin(math.radians(text_hue + 240)))
+
+                # Recolor text if it's damage/healing
+                if "(weak)" in str(text) or any(word in str(text) for word in ["-", "+"]):
+                    pulse_text = pygame.transform.smoothscale(small_font.render(
+                        str(text).replace('<pygame.Surface(', '').replace(')>', ''), True, (r, g, b)),
+                        (int(text.get_width() * pulse), int(text.get_height() * pulse)))
+                    pulse_text = pulse_text.convert_alpha()
+                    pulse_text.set_alpha(min(255, life * 4))
+
+                text_x = pos[0] - pulse_text.get_width() // 2 + screen_shake
+                text_y = y_offset + abs(math.sin(current_time * 0.01 + y_offset)) * 10
+
+                screen.blit(pulse_text, (text_x, text_y))
+                life -= 2  # Faster fade
+
+                if life > 0:
+                    filtered_texts.append((text, pos, life))
+                else:
+                    # Create farewell particles when text fades
+                    create_particles(text_x + pulse_text.get_width()//2, text_y + pulse_text.get_height()//2,
+                                   (r, g, b), count=15, spread=30, speed=5)
+
+                y_offset += 60  # More spacing for animation
+
+        damage_texts[:] = filtered_texts
+
+        # Apply temporary effects for special game states
+        if game_timer.waiting_for_enemy_turn:
+            # Pulsing border when waiting for enemy
+            border_alpha = int(128 + 127 * math.sin(current_time * 0.008))
+            border_color = RED + (border_alpha,)
+            pygame.draw.rect(screen, border_color, (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT), 5)
+
+        # Draw current level indicator
+        level_text = small_font.render(f"Level {current_level}", True, WHITE)
+        level_bg = pygame.Surface((level_text.get_width() + 20, level_text.get_height() + 10))
+        level_bg.fill(BLACK)
+        level_bg.set_alpha(128)
+        screen.blit(level_bg, (SCREEN_WIDTH - level_text.get_width() - 30, 20))
+        screen.blit(level_text, (SCREEN_WIDTH - level_text.get_width() - 25, 25))
+
+        # Health/Mana bars with glow effects
+        bar_y = hero_y + 35
+        # Hero health bar
+        total_health = 100 + player_extra_health
+        health_ratio = selected_hero.health / total_health
+        pygame.draw.rect(screen, RED, (10, bar_y, int(200 * health_ratio), 20))
+        pygame.draw.rect(screen, DARK_RED, (10, bar_y, 200, 20), 2)
+        # Glow for low health
+        if health_ratio < 0.3:
+            for offset in range(3):
+                glow_rect = pygame.Rect(10 - offset, bar_y - offset, int(200 * health_ratio) + offset * 2, 20 + offset * 2)
+                pygame.draw.rect(screen, RED, glow_rect, 1)
+
+        # Hero mana bar
+        total_mana = 100 + player_extra_mana
+        mana_ratio = selected_hero.mana / total_mana
+        mana_y = bar_y + 25
+        pygame.draw.rect(screen, BLUE, (10, mana_y, int(200 * mana_ratio), 20))
+        pygame.draw.rect(screen, DARK_BLUE, (10, mana_y, 200, 20), 2)
+
+        # Enemy health bar (mirrored style)
+        enemy_bar_x = SCREEN_WIDTH - 210
+        enemy_health_ratio = enemy.health / enemy.max_health
+        pygame.draw.rect(screen, RED, (enemy_bar_x, 45, int(200 * enemy_health_ratio), 20))
+        pygame.draw.rect(screen, DARK_RED, (enemy_bar_x, 45, 200, 20), 2)
+
+        # Enemy mana bar
+        enemy_mana_ratio = enemy.mana / 50
+        enemy_mana_y = 70
+        pygame.draw.rect(screen, BLUE, (enemy_bar_x, enemy_mana_y, int(200 * enemy_mana_ratio), 20))
+        pygame.draw.rect(screen, DARK_BLUE, (enemy_bar_x, enemy_mana_y, 200, 20), 2)
+
+def create_particles(x, y, color, count=8, spread=50, speed=3):
+    """Create particle effects for attacks/healing"""
+    for _ in range(count):
+        dx = random.uniform(-speed, speed)
+        dy = random.uniform(-speed, speed)
+        particles.append(Particle(x + random.uniform(-spread, spread),
+                                y + random.uniform(-spread, spread), color, dx, dy))
 
 # Initialize global variables
 current_level = 1
@@ -451,6 +934,9 @@ player_extra_mana = 0
 unlocked_abilities = {}
 bought_mercenaries = []
 shop_items = default_shop_items.copy()
+
+# Save flags to prevent continuous saving
+save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
 
 def refresh_shop_items():
     """Check if shop needs to be refreshed for the new day"""
@@ -517,12 +1003,19 @@ clock = pygame.time.Clock()
 
 def enemy_turn():
     global game_state
+    game_timer.enemy_turn_count += 1
+
     if enemy.health > 0 and selected_hero.health > 0:
         # Enemy chooses random ability
         ability_index = random.randint(0, len(enemy.abilities) - 1)
         ability = enemy.abilities[ability_index]
 
-        if ability["name"] == "Heal" and enemy.mana >= 5 and enemy.health < enemy.max_health:
+        # Prevent Special ability from being used in first 2 turns
+        if ability.get("name") == "Special" and game_timer.enemy_turn_count < 3:
+            # Force Attack instead
+            ability = enemy.abilities[0]  # Attack is index 0
+
+        if ability.get("name") == "Heal" and enemy.mana >= 5 and enemy.health < enemy.max_health:
             enemy.mana -= 5
             heal_amount = ability["heal"]
             enemy.health = min(enemy.health + heal_amount, enemy.max_health)
@@ -530,9 +1023,15 @@ def enemy_turn():
         else:
             # Reduce damage if mercenaries are bought
             damage_reduction = len(bought_mercenaries) * 0.1
-            reduced_damage = ability["damage"] * (1 - damage_reduction)
-            selected_hero.health -= reduced_damage
-            damage_texts.append((small_font.render(f"Enemy {ability['name']}: -{int(reduced_damage)}", True, RED), [200, 200], 60))
+            if "damage" in ability:
+                reduced_damage = ability["damage"] * (1 - damage_reduction)
+                selected_hero.health -= reduced_damage
+                damage_texts.append((small_font.render(f"Enemy {ability.get('name', 'Attack')}: -{int(reduced_damage)}", True, RED), [200, 200], 60))
+            else:
+                # If no damage key, treat as a special attack with base damage
+                reduced_damage = (10 + current_level * 2) * (1 - damage_reduction)
+                selected_hero.health -= reduced_damage
+                damage_texts.append((small_font.render(f"Enemy {ability.get('name', 'Special')}: -{int(reduced_damage)}", True, RED), [200, 200], 60))
 
             if selected_hero.health <= 0:
                 game_state = LOSE
@@ -563,7 +1062,7 @@ def purchase_item(index):
             HEROES.append(item["hero"])
 
 def reset_game():
-    global selected_hero, enemy, hero_buttons, ability_buttons, animation_frames, animation_button, damage_texts, game_state
+    global selected_hero, enemy, hero_buttons, ability_buttons, animation_frames, animation_button, damage_texts, game_state, save_flags
     selected_hero = None
     enemy = None
     hero_buttons = []
@@ -571,45 +1070,62 @@ def reset_game():
     animation_frames = 0
     animation_button = -1
     damage_texts = []
+    game_timer.last_enemy_turn = 0
+    game_timer.enemy_turn_count = 0
+    game_timer.player_turn_count = 0
+    game_timer.waiting_for_enemy_turn = False
     game_state = WELCOME
 
-# Main loop
+    # Reset save flags for new game
+    save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
+
+    # Main loop
 while running:
     clock.tick(60)
+    current_time = pygame.time.get_ticks()
+
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.KEYDOWN:
-            if game_state == WELCOME:
+            if event.key == pygame.K_d and not DEBUG_MODE:
+                DEBUG_MODE = True
+                print("DEBUG MODE: ON")
+            elif event.key == pygame.K_d and DEBUG_MODE:
+                DEBUG_MODE = False
+                print("DEBUG MODE: OFF")
+            elif game_state == WELCOME:
                 game_state = SELECTION
                 load_game()
-        elif game_state == SELECTION:
+        elif game_state == SELECTION and event.type == pygame.KEYDOWN:
             if event.key == pygame.K_s:
                 game_state = SHOP
                 play_background_music('shop')
             elif event.key == pygame.K_b:
                 game_state = SELECTION
-            elif game_state == SHOP:
-                if event.key == pygame.K_b:
+        elif game_state == SHOP and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_b:
+                game_state = SELECTION
+        elif game_state in [WIN, LOSE, TIE, FINAL_WIN] and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_r:
+                if game_state == WIN:
+                    current_level += 1
+                    coins += 30
+                elif game_state == TIE:
+                    coins += 15
+                elif game_state == LOSE:
+                    current_level = 1
+                elif game_state == FINAL_WIN:
+                    pass
+                reset_game()
+                if current_level > 20:
+                    game_state = FINAL_WIN
+                else:
                     game_state = SELECTION
-            elif game_state in [WIN, LOSE, TIE, FINAL_WIN]:
-                if event.key == pygame.K_r:
-                    if game_state == WIN:
-                        current_level += 1
-                        coins += 30 if game_state == WIN else 15
-                    elif game_state == TIE:
-                        coins += 15
-                    elif game_state == FINAL_WIN:
-                        pass
-                    else:
-                        current_level = 1
-                    reset_game()
-                    if current_level > 20:
-                        game_state = FINAL_WIN
-                    else:
-                        game_state = SELECTION
-                elif event.key == pygame.K_q:
-                    running = False
+                # Reset save flags after restart
+                save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
+            elif event.key == pygame.K_q:
+                running = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = pygame.mouse.get_pos()
             if game_state == SELECTION:
@@ -618,42 +1134,72 @@ while running:
                         selected_hero = Hero(HEROES[i])
                         enemy = Enemy(current_level)
                         game_state = BATTLE
+                        # Reset turn counts for new battle
+                        game_timer.enemy_turn_count = 0
+                        game_timer.player_turn_count = 0
                         break
             elif game_state == BATTLE:
-                for i, button in enumerate(ability_buttons):
-                    if button.collidepoint(mouse_x, mouse_y):
-                        ability = selected_hero.abilities[i]
-                        mana_cost = ability.get("mana", 0)
-                        if selected_hero.mana >= mana_cost:
-                            selected_hero.mana -= mana_cost
-                            if "damage" in ability:
-                                damage = ability["damage"]
-                                if ability.get("effect") == "poison":
-                                    enemy.poison += 1
-                                    damage_texts.append((small_font.render(f"{ability['name']}: -{damage} +Poison", True, GREEN), [600, 200], 60))
-                                else:
-                                    damage_texts.append((small_font.render(f"{ability['name']}: -{damage}", True, GREEN), [600, 200], 60))
-                                enemy.health -= damage
-                                animation_frames = 10
-                                animation_button = i
-                                if enemy.health <= 0:
-                                    if current_level >= 10:
-                                        game_state = FINAL_WIN
-                                        coins += 30
+                # Check skip button first if available
+                skip_clicked = False
+                if skip_button is not None and skip_button.collidepoint(mouse_x, mouse_y):
+                    # Skip turn - directly trigger TIE since you can't use any abilities
+                    game_state = TIE
+                    coins += 15
+                    skip_clicked = True
+
+                if not skip_clicked:
+                    for i, button in enumerate(ability_buttons):
+                        if button.collidepoint(mouse_x, mouse_y):
+                            ability = selected_hero.abilities[i]
+                            mana_cost = ability.get("mana", 0)
+                            if selected_hero.mana >= mana_cost:
+                                selected_hero.mana -= mana_cost
+                                game_timer.player_turn_count += 1
+
+                                # Check if player can use powerful abilities
+                                is_powerful_ability = (ability["name"] in ["Lightning", "Charge", "Rapid Fire"])
+
+                                # Prevent powerful abilities from being used in first 2 turns - completely locked
+                                if is_powerful_ability and game_timer.player_turn_count < 3:
+                                    # Cannot use powerful abilities yet - show message and continue without turn
+                                    damage_texts.append((small_font.render(f"{ability['name']} LOCKED! Available after turn 3", True, RED), [400, 300], 60))
+                                    continue  # Skip the ability, don't use turn
+
+                                if "damage" in ability:
+                                    damage = ability["damage"]
+                                    if ability.get("effect") == "poison":
+                                        enemy.poison += 1
+                                        damage_texts.append((small_font.render(f"{ability['name']}: -{damage} +Poison", True, GREEN), [600, 200], 60))
                                     else:
-                                        game_state = WIN
-                                        coins += 30
-                                    enemy.health = 0
-                                elif selected_hero.mana <= 0 and not any(selected_hero.mana >= a.get('mana', 0) for a in selected_hero.abilities):
-                                    game_state = TIE
-                                    coins += 15
-                                else:
-                                    enemy_turn()
-                            elif "heal" in ability:
-                                heal_amount = ability["heal"]
-                                selected_hero.health = min(selected_hero.health + heal_amount, 100 + player_extra_health)
-                                damage_texts.append((small_font.render(f"{ability['name']}: +{heal_amount}", True, BLUE), [200, 200], 60))
-                                enemy_turn()
+                                        damage_texts.append((small_font.render(f"{ability['name']}: -{damage}", True, GREEN), [600, 200], 60))
+                                    enemy.health -= damage
+                                    animation_frames = 10
+                                    animation_button = i
+                                    if enemy.health <= 0:
+                                        if current_level >= 10:
+                                            game_state = FINAL_WIN
+                                            coins += 30
+                                        else:
+                                            game_state = WIN
+                                            coins += 30
+                                        enemy.health = 0
+                                    elif selected_hero.mana <= 0 and not any(selected_hero.mana >= a.get('mana', 0) for a in selected_hero.abilities):
+                                        game_state = TIE
+                                        coins += 15
+                                    else:
+                                        # Start timer for enemy turn (after damage abilities only)
+                                        game_timer.last_enemy_turn = current_time + game_timer.ENEMY_TURN_DELAY
+                                        game_timer.waiting_for_enemy_turn = True
+                                elif "heal" in ability:
+                                    heal_amount = ability["heal"]
+                                    selected_hero.health = min(selected_hero.health + heal_amount, 100 + player_extra_health)
+                                    damage_texts.append((small_font.render(f"{ability['name']}: +{heal_amount}", True, BLUE), [200, 200], 60))
+                                    # Healing abilities don't trigger enemy turns
+                                    continue
+                            else:
+                                # Not enough mana - show message
+                                damage_texts.append((small_font.render("Not enough mana!", True, RED), [400, 300], 60))
+                            break
             elif game_state == SHOP:
                 # Shop item purchasing by mouse click
                 y_offset = 100
@@ -663,6 +1209,14 @@ while running:
                         if text_rect.collidepoint(mouse_x, mouse_y):
                             purchase_item(i)
                         y_offset += 30
+
+    # Enemy AI timing - ONLY trigger after player action
+    if game_state == BATTLE and selected_hero is not None and enemy is not None and game_timer.waiting_for_enemy_turn:
+        if current_time - game_timer.last_enemy_turn > game_timer.ENEMY_TURN_DELAY:
+            if enemy.health > 0 and selected_hero.health > 0:
+                enemy_turn()
+                game_timer.last_enemy_turn = current_time
+                game_timer.waiting_for_enemy_turn = False
 
     # Handle mouse hover for cursor change
     mouse_x, mouse_y = pygame.mouse.get_pos()
