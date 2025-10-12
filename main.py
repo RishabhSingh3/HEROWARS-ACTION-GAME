@@ -751,6 +751,7 @@ def draw_welcome():
         "- S: Open shop to buy upgrades",
         "- B: Go back from shop",
         "- R: Restart after battle/end game",
+        "- P: Next level after battle",
         "- Q: Quit game",
         "",
         "Goal: Battle through 20 levels and defeat enemies!",
