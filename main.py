@@ -294,7 +294,7 @@ class Hero:
         self.color = tuple(color_data) if isinstance(color_data, list) else color_data
         self.health = 100 + player_extra_health
         self.mana = 100 + player_extra_mana
-        self.abilities = data["abilities"] + unlocked_abilities.get(data["name"], [])
+        self.abilities = unlocked_abilities.get(data["name"], []) + data["abilities"]
 
 # Enemy class
 class Enemy:
@@ -728,9 +728,7 @@ def draw_shop():
         glow_surface.set_alpha(50 - glow_offset * 10)
         screen.blit(glow_surface, (0 - glow_offset, 40 - glow_offset * 2))
 
-    title = font.render("EPIC SHOP", True, BLACK)
-    title_x = SCREEN_WIDTH//2 - title.get_width()//2
-    screen.blit(title, (title_x, 50))
+    # Remove EPIC SHOP title as requested
 
     # Epic coins display with animation
     coins_text = small_font.render(f"💰 EPIC COINS: {coins} 💰", True, WHITE)
@@ -807,11 +805,13 @@ def draw_shop():
             name_surface = small_font.render(item['name'], True, text_color)
             screen.blit(name_surface, (left_margin, text_y + 15))
 
-            # Item cost - third line, right aligned
+            # Item cost - third line, more right and upward aligned within item box
             cost_text = f"{item['cost']} coins"
             cost_surface = small_font.render(cost_text, True, text_color)
-            cost_x = 50 + item_width - cost_surface.get_width() - 20  # Right aligned with margin
-            screen.blit(cost_surface, (cost_x, text_y + 30))
+            # Position cost text right-aligned and higher up
+            cost_x = 640 - cost_surface.get_width()
+            cost_y = text_y + 15      # Move even higher up
+            screen.blit(cost_surface, (cost_x, cost_y))
 
             # Highlight cursor on hover
             if is_hovering_item:
@@ -927,7 +927,7 @@ def draw_battle():
         can_use_any_ability = any(selected_hero.mana >= a.get("mana", 0) for a in selected_hero.abilities)
 
         if not can_use_any_ability:
-            skip_button = pygame.Rect(400, SCREEN_HEIGHT - 200, 120, 60)  # Smaller skip button ABOVE abilities
+            skip_button = pygame.Rect(SCREEN_WIDTH - 130, SCREEN_HEIGHT - 200, 120, 60)  # Skip button at RIGHT side
 
             # IMPORTANT: Check if SKIP button is being hovered/clicked DURING drawing
             mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -939,7 +939,7 @@ def draw_battle():
 
             # Multi-layer glowing border (smaller scale)
             for glow_layer in range(2):
-                glow_rect = pygame.Rect(400 - glow_layer, SCREEN_HEIGHT - 200 - glow_layer,
+                glow_rect = pygame.Rect(SCREEN_WIDTH - 130 - glow_layer, SCREEN_HEIGHT - 200 - glow_layer,
                                       120 + glow_layer * 2, 60 + glow_layer * 2)
                 glow_alpha = 150 - glow_layer * 60
                 if glow_alpha > 0:
@@ -974,8 +974,8 @@ def draw_battle():
             total_height = skip_text.get_height() + sub_text_render.get_height() + 2
             start_y = text_y - total_height // 2
 
-            # Draw main "SKIP" text
-            main_text_x = text_x - skip_text.get_width() // 2
+            # Fix: Use correct x position for text rendering
+            main_text_x = SCREEN_WIDTH - 130 + 120//2 - skip_text.get_width() // 2
             main_text_y = start_y
 
             # Shadow behind text
@@ -996,7 +996,7 @@ def draw_battle():
             screen.blit(skip_text, (main_text_x, main_text_y))
 
             # Draw "TURN" text below
-            sub_text_x = text_x - sub_text_render.get_width() // 2
+            sub_text_x = SCREEN_WIDTH - 130 + 120//2 - sub_text_render.get_width() // 2
             sub_text_y = start_y + skip_text.get_height() + 2
 
             # Shadow for "TURN"
@@ -1271,6 +1271,10 @@ player_extra_mana = 0
 unlocked_abilities = {}
 bought_mercenaries = []
 shop_items = default_shop_items.copy()
+
+# Shop layout constants (must be global for hover detection)
+SHOP_ITEM_HEIGHT = 40
+SHOP_ITEM_WIDTH = 600
 
 # Save flags to prevent continuous saving
 save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
@@ -1601,11 +1605,11 @@ while running:
         y_offset = 100
         for item in shop_items:
             if not item["purchased"]:
-                text_rect = pygame.Rect(50, y_offset, item_width, item_height)
+                text_rect = pygame.Rect(50, y_offset, SHOP_ITEM_WIDTH, SHOP_ITEM_HEIGHT)
                 if text_rect.collidepoint(mouse_x, mouse_y):
                     hovering = True
                     break
-                y_offset += item_height + 5  # Match the increment used in drawing
+                y_offset += SHOP_ITEM_HEIGHT + 5  # Match the increment used in drawing
 
     if hovering:
         pygame.mouse.set_cursor(pygame.SYSTEM_CURSOR_HAND)
