@@ -8,7 +8,13 @@ pygame.init()
 
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 600
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+# Try fullscreen first, fallback to windowed if it fails
+try:
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.FULLSCREEN)
+except:
+    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
 pygame.display.set_caption("Hero Battle Game")
 
 # Colors
@@ -283,7 +289,9 @@ HEROES = [
 class Hero:
     def __init__(self, data):
         self.name = data["name"]
-        self.color = data["color"]
+        # Ensure color is always a tuple for pygame compatibility
+        color_data = data["color"]
+        self.color = tuple(color_data) if isinstance(color_data, list) else color_data
         self.health = 100 + player_extra_health
         self.mana = 100 + player_extra_mana
         self.abilities = data["abilities"] + unlocked_abilities.get(data["name"], [])
@@ -530,21 +538,98 @@ def generate_procedural_music(state):
 play_background_music('welcome')
 
 def draw_hero_selection():
-    screen.fill(BLACK)
-    title = font.render("Choose Your Hero", True, WHITE)
-    screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 50))
+    global hue_shift
+    # Animated background similar to battle screen
+    hue_shift += 0.01
+    if hue_shift > 1:
+        hue_shift = 0
+    # Rainbow background for selection screen
+    r = int(64 + 191 * abs(math.sin(2 * math.pi * hue_shift)))
+    g = int(32 + 223 * abs(math.sin(2 * math.pi * hue_shift + 1)))
+    b = int(96 + 159 * abs(math.sin(2 * math.pi * hue_shift + 2)))
+    screen.fill((r, g, b))
 
-    shop_prompt = small_font.render("Press S for Shop", True, WHITE)
-    screen.blit(shop_prompt, (SCREEN_WIDTH//2 - shop_prompt.get_width()//2, 80))
+    # Add floating particles
+    for i in range(15):
+        particle_x = int(SCREEN_WIDTH * abs(math.sin(hue_shift * 2 + i * 0.2)) % SCREEN_WIDTH)
+        particle_y = int(SCREEN_HEIGHT * abs(math.cos(hue_shift * 1.5 + i * 0.3)) % SCREEN_HEIGHT)
+        particle_size = 2 + int(math.sin(hue_shift * 4 + i) * 1)
+        pygame.draw.circle(screen, WHITE + (30,), (particle_x, particle_y), particle_size)
+
+    # Highly visible title with strong contrast
+    title = font.render("Choose Your Hero", True, BLACK)
+    title_x = SCREEN_WIDTH//2 - title.get_width()//2
+    title_y = 50
+
+    # Calculate title background rectangle for visibility
+    bg_width = title.get_width() + 60
+    bg_height = title.get_height() + 20
+    bg_x = SCREEN_WIDTH//2 - bg_width//2
+    bg_y = 40
+
+    # Draw solid white background for perfect contrast
+    title_bg = pygame.Surface((bg_width, bg_height))
+    title_bg.fill((255, 255, 255))  # Full white background
+    title_bg.set_alpha(255)  # Fully opaque
+    screen.blit(title_bg, (bg_x, bg_y))
+
+    # Add black border for definition
+    pygame.draw.rect(screen, BLACK, (bg_x, bg_y, bg_width, bg_height), 3)
+
+    # Render title text
+    title_x_within_bg = bg_x + 30  # 30px padding
+    title_y_within_bg = bg_y + 10
+    screen.blit(title, (title_x_within_bg, title_y_within_bg))
+
+    # Highly visible shop prompt with strong contrast - positioned below title
+    shop_prompt_text = "Press S for Shop"
+    shop_prompt = small_font.render(shop_prompt_text, True, BLACK)  # Changed to black for maximum contrast
+    # Calculate background rectangle with larger margins
+    bg_width = shop_prompt.get_width() + 60
+    bg_height = shop_prompt.get_height() + 20
+    bg_x = SCREEN_WIDTH//2 - bg_width//2
+    bg_y = 105  # Moved below title (title ends at ~96, this starts at 105)
+    # Draw solid white background for perfect contrast
+    prompt_bg = pygame.Surface((bg_width, bg_height))
+    prompt_bg.fill((255, 255, 255))  # Full white background
+    prompt_bg.set_alpha(255)  # Fully opaque
+    screen.blit(prompt_bg, (bg_x, bg_y))
+    # Add black border for definition
+    pygame.draw.rect(screen, BLACK, (bg_x, bg_y, bg_width, bg_height), 3)
+    screen.blit(shop_prompt, (bg_x + 30, bg_y + 10))
 
     global hero_buttons
     hero_buttons = []
     for i, hero in enumerate(HEROES):
+        # Animated button effects
+        button_pulse = 1.0 + 0.1 * abs(math.sin(current_time * 0.004 + i * 0.5))
+
         text = font.render(hero["name"], True, hero["color"])
-        x = SCREEN_WIDTH//2 - text.get_width()//2
+        button_width = int(text.get_width() * button_pulse)
+        button_height = int(text.get_height() * button_pulse)
+
+        x = SCREEN_WIDTH//2 - button_width//2
         y = 150 + i * 80
-        hero_buttons.append(pygame.Rect(x, y, text.get_width(), text.get_height()))
+        hero_buttons.append(pygame.Rect(x, y, button_width, button_height))
+
+        # Draw button background with glow
+        button_bg = (hero["color"][0]//4, hero["color"][1]//4, hero["color"][2]//4, 100)
+        pygame.draw.rect(screen, button_bg, (x-10, y-5, button_width+20, button_height+10), border_radius=10)
+
+        # Glowing border animation
+        border_color = tuple(min(255, c + 100) for c in hero["color"])
+        border_rect = pygame.Rect(x-10, y-5, button_width+20, button_height+10)
+        pygame.draw.rect(screen, border_color, border_rect, 2, border_radius=10)
+
         screen.blit(text, (x, y))
+
+        # Add energy particles around selected hero button
+        for p in range(3):
+            particle_offset = 20 + p * 10
+            particle_angle = current_time * 0.01 + i * 2 + p * 1.3
+            p_x = x + button_width//2 + int(math.cos(particle_angle) * particle_offset)
+            p_y = y + button_height//2 + int(math.sin(particle_angle) * particle_offset)
+            pygame.draw.circle(screen, tuple(hero["color"]) + (150 - p*40,), (p_x, p_y), 2)
 
 def draw_win():
     if not save_flags['win']:
@@ -731,14 +816,21 @@ def draw_shop():
 
             y_offset += item_height + 5  # Adjusted spacing
 
-    # Epic return text with glow
-    return_bg = pygame.Surface((300, 40))
-    return_bg.fill((150, 200, 255))
-    return_bg.set_alpha(150)
-    screen.blit(return_bg, (SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT - 50))
+    # Clearer return text with better instructions
+    instructions = [
+        "SHOP: Buy upgrades, abilities, and new heroes!",
+        "Click items to purchase | Press B to return to hero selection"
+    ]
 
-    return_text = small_font.render("Press B to go back", True, BLACK)
-    screen.blit(return_text, (SCREEN_WIDTH//2 - return_text.get_width()//2, SCREEN_HEIGHT - 50))
+    y_offset = 10
+    for i, line in enumerate(instructions):
+        text_surface = small_font.render(line, True, WHITE if i % 2 == 0 else GREEN)
+        bg_surface = pygame.Surface((text_surface.get_width() + 40, text_surface.get_height() + 10))
+        bg_surface.fill(BLACK if i % 2 == 0 else DARK_BLUE)
+        bg_surface.set_alpha(180)
+        screen.blit(bg_surface, ((SCREEN_WIDTH - bg_surface.get_width())//2, y_offset))
+        screen.blit(text_surface, ((SCREEN_WIDTH - text_surface.get_width())//2, y_offset + 5))
+        y_offset += text_surface.get_height() + 10
 
 def draw_welcome():
     screen.fill(BLACK)
@@ -755,6 +847,8 @@ def draw_welcome():
         "- Q: Quit game",
         "",
         "Goal: Battle through 20 levels and defeat enemies!",
+        "",
+        "P key: Next level after victory/tie",
         "",
         "Press any key to start"
     ]
@@ -828,7 +922,7 @@ def draw_battle():
         can_use_any_ability = any(selected_hero.mana >= a.get("mana", 0) for a in selected_hero.abilities)
 
         if not can_use_any_ability:
-            skip_button = pygame.Rect(600, SCREEN_HEIGHT - 90, 160, 80)  # Set skip button
+            skip_button = pygame.Rect(400, SCREEN_HEIGHT - 200, 120, 60)  # Smaller skip button ABOVE abilities
 
             # IMPORTANT: Check if SKIP button is being hovered/clicked DURING drawing
             mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -838,16 +932,16 @@ def draw_battle():
             skip_bg_color = (150, 150, 255) if is_hovering_skip else (100, 100, 200)
             missing_bg_color = tuple(max(0, c - 30) for c in skip_bg_color)  # Slightly darker for depth
 
-            # Multi-layer glowing border
-            for glow_layer in range(3):
-                glow_rect = pygame.Rect(600 - glow_layer, SCREEN_HEIGHT - 90 - glow_layer,
-                                      160 + glow_layer * 2, 80 + glow_layer * 2)
-                glow_alpha = 150 - glow_layer * 40
+            # Multi-layer glowing border (smaller scale)
+            for glow_layer in range(2):
+                glow_rect = pygame.Rect(400 - glow_layer, SCREEN_HEIGHT - 200 - glow_layer,
+                                      120 + glow_layer * 2, 60 + glow_layer * 2)
+                glow_alpha = 150 - glow_layer * 60
                 if glow_alpha > 0:
-                    pygame.draw.rect(screen, skip_bg_color + (glow_alpha,), glow_rect, border_radius=8)
+                    pygame.draw.rect(screen, skip_bg_color + (glow_alpha,), glow_rect, border_radius=6)
 
             # Main button fill
-            pygame.draw.rect(screen, skip_bg_color, skip_button, border_radius=8)
+            pygame.draw.rect(screen, skip_bg_color, skip_button, border_radius=6)
 
             # Inner border for 3D effect
             pygame.draw.rect(screen, missing_bg_color, skip_button, border_radius=8, width=1)
@@ -858,14 +952,14 @@ def draw_battle():
                 highlight_color = (255, 255, 100)  # Bright yellow highlight
                 pygame.draw.rect(screen, highlight_color, skip_button, border_radius=8, width=4)
 
-            # Enhanced text rendering with multiple effects
-            skip_font = pygame.font.SysFont(None, 36) if is_hovering_skip else pygame.font.SysFont(None, 32)
+            # Enhanced text rendering with multiple effects (smaller for smaller button)
+            skip_font = pygame.font.SysFont(None, 28) if is_hovering_skip else pygame.font.SysFont(None, 24)
             button_text = "SKIP" if is_hovering_skip else "SKIP"
             sub_text = "TURN" if is_hovering_skip else "TURN"
 
-            # Main text with drop shadow
-            text_x = 600 + 160//2
-            text_y = SCREEN_HEIGHT - 90 + 80//2
+            # Main text with drop shadow (centered for smaller button)
+            text_x = 400 + 120//2
+            text_y = SCREEN_HEIGHT - 200 + 60//2
 
             # Draw centered text with shadow effect
             skip_text = skip_font.render(button_text, True, (255, 255, 255))
