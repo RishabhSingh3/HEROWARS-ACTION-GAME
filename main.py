@@ -54,10 +54,11 @@ def get_daily_shop_items():
     """Generate daily shop items based on current date"""
     today = get_current_date()
 
-    # Base items that are always available
+    # Base items that are always available (including damage upgrades!)
     daily_items = [
         {"name": "Upgrade Health (+10)", "cost": 20, "purchased": False, "type": "upgrade", "stat": "health", "amount": 10},
-        {"name": "Upgrade Mana (+10)", "cost": 25, "purchased": False, "type": "upgrade", "stat": "mana", "amount": 10}
+        {"name": "Upgrade Mana (+10)", "cost": 25, "purchased": False, "type": "upgrade", "stat": "mana", "amount": 10},
+        {"name": "Upgrade Damage (+5)", "cost": 35, "purchased": False, "type": "upgrade", "stat": "damage", "amount": 5}
     ]
 
     # Use date as seed for random but deterministic daily items
@@ -174,8 +175,21 @@ def get_daily_shop_items():
         }
     ]
 
-    # Select 2 random special items for today (reduced to make room for heroes)
-    selected_special = random.sample(special_items, 2)
+    # Select 2 random special items for today from different hero types (prevents same abilities)
+    available_special = special_items.copy()
+    selected_special = []
+
+    # Try to pick different hero types where possible
+    for _ in range(min(2, len(available_special))):
+        if available_special:
+            chosen = random.choice(available_special)
+            selected_special.append(chosen)
+            # Remove other abilities of same hero type to prevent duplicates
+            hero_type = chosen.get("hero") or chosen.get("type", "")
+            available_special = [item for item in available_special
+                               if item.get("hero") != hero_type and
+                                  item.get("type", "") != hero_type]
+
     daily_items.extend(selected_special)
 
     # Add daily Epic Hero
@@ -188,23 +202,72 @@ def get_daily_shop_items():
 
     return daily_items
 
+def calculate_permanent_purchase_cost():
+    """Calculate total coins spent on permanent upgrades (never refunded on fresh start)"""
+    global player_extra_damage, unlocked_abilities, bought_mercenaries, HEROES
+    total_cost = 0
+
+    # Damage upgrades cost (permanent)
+    damage_upgrade_cost = 35  # Each +5 damage upgrade costs 35 coins
+    if player_extra_damage > 0:
+        damage_upgrades_bought = player_extra_damage // 5  # Each gives +5
+        total_cost += damage_upgrades_bought * damage_upgrade_cost
+
+    # Mercenary costs (permanent)
+    for mercenary in bought_mercenaries:
+        total_cost += mercenary["cost"]
+
+    # Ability costs (permanent)
+    for hero, abilities in unlocked_abilities.items():
+        for ability in abilities:
+            # Find ability cost in shop items
+            for item in default_shop_items:
+                if item["type"] == "ability" and item["hero"] == hero and item["ability"]["name"] == ability["name"]:
+                    total_cost += item["cost"]
+                    break
+
+    # New hero costs (permanent) - exclude base heroes
+    base_heroes = ["Warrior", "Mage", "Archer"]
+    for hero_data in HEROES:
+        if hero_data["name"] not in base_heroes:
+            # Find hero cost in shop items
+            for item in default_shop_items:
+                if item["type"] == "new_hero" and item["hero"]["name"] == hero_data["name"]:
+                    total_cost += item["cost"]
+                    break
+
+    return total_cost
+
 def load_game():
-    global current_level, coins, player_extra_health, player_extra_mana, unlocked_abilities, bought_mercenaries, shop_items, HEROES
+    global current_level, coins, player_extra_health, player_extra_mana, player_extra_damage, unlocked_abilities, bought_mercenaries, shop_items, HEROES
     if os.path.exists(SAVE_FILE):
         with open(SAVE_FILE, 'r') as f:
             try:
                 save_data = json.load(f)
                 current_level = save_data.get('current_level', 1)
-                coins = save_data.get('coins', 0)
+                saved_coins = save_data.get('coins', 0)
                 player_extra_health = save_data.get('player_extra_health', 0)
                 player_extra_mana = save_data.get('player_extra_mana', 0)
+                player_extra_damage = save_data.get('player_extra_damage', 0)
                 unlocked_abilities = save_data.get('unlocked_abilities', {})
                 bought_mercenaries = save_data.get('bought_mercenaries', [])
                 shop_items[:] = save_data.get('shop_items', [])
                 HEROES[:] = save_data.get('heroes', [])
-                print(f"Game loaded: Level {current_level}, Coins: {coins}")
+                print(f"Upgrades loaded - Permanent stats preserved!")
             except Exception as e:
                 print(f"Failed to load save: {e}")
+                return
+
+            # Calculate permanent purchase costs
+            permanent_cost = calculate_permanent_purchase_cost()
+
+            # FORCE FRESH START LEVEL - OVERRIDE SAVED LEVEL
+            current_level = 1
+
+            # Subtract permanent purchase costs from saved coins
+            coins = max(0, saved_coins - permanent_cost)
+
+            print(f"Fresh Start: Level {current_level}, Coins: {coins} (deducted {permanent_cost} for permanent purchases)")
 
 def save_game():
     save_data = {
@@ -212,6 +275,7 @@ def save_game():
         'coins': coins,
         'player_extra_health': player_extra_health,
         'player_extra_mana': player_extra_mana,
+        'player_extra_damage': player_extra_damage,
         'unlocked_abilities': unlocked_abilities,
         'bought_mercenaries': bought_mercenaries,
         'shop_items': shop_items,
@@ -230,6 +294,7 @@ def save_game():
 default_shop_items = [
     {"name": "Upgrade Health (+10)", "cost": 20, "purchased": False, "type": "upgrade", "stat": "health", "amount": 10},
     {"name": "Upgrade Mana (+10)", "cost": 25, "purchased": False, "type": "upgrade", "stat": "mana", "amount": 10},
+    {"name": "Upgrade Damage (+5)", "cost": 35, "purchased": False, "type": "upgrade", "stat": "damage", "amount": 5},
     {"name": "Unlock Rocket Ability (Mage)", "cost": 50, "purchased": False, "type": "ability", "hero": "Mage", "ability": {"name": "Rocket", "damage": 50, "mana": 30}},
     {"name": "Buy Mercenary (reduces enemy damage)", "cost": 30, "purchased": False, "type": "mercenary"},
     {"name": "Unlock New Hero: Paladin", "cost": 100, "purchased": False, "type": "new_hero", "hero": {
@@ -294,20 +359,57 @@ class Hero:
         self.color = tuple(color_data) if isinstance(color_data, list) else color_data
         self.health = 100 + player_extra_health
         self.mana = 100 + player_extra_mana
-        self.abilities = unlocked_abilities.get(data["name"], []) + data["abilities"]
+        # Remove duplicate abilities and keep unique ones
+        seen_ability_names = set()
+        unique_abilities = []
+
+        # First add unlocked/purchased abilities
+        for ability in unlocked_abilities.get(data["name"], []):
+            ability_name = ability.get("name")
+            if ability_name not in seen_ability_names:
+                seen_ability_names.add(ability_name)
+                unique_abilities.append(ability)
+
+        # Then add base hero abilities, skipping duplicates
+        for ability in data["abilities"]:
+            ability_name = ability.get("name")
+            if ability_name not in seen_ability_names:
+                seen_ability_names.add(ability_name)
+                unique_abilities.append(ability)
+
+        self.abilities = unique_abilities
 
 # Enemy class
 class Enemy:
     def __init__(self, level):
-        self.max_health = 100 + level * 50  # Increasing health with level
-        self.health = self.max_health
-        self.mana = 50
+        # Check if this is a boss fight (every 5 levels)
+        self.is_boss = (level % 5 == 0 and level > 0)
+        self.boss_name = ""
+
+        if self.is_boss:
+            # Boss enemy with much stronger stats
+            self.max_health = 200 + level * 100  # 4x health
+            self.health = self.max_health
+            self.mana = 150  # 3x mana
+            self.boss_name = f"BOSS - Level {level}"
+            self.abilities = [
+                {"name": "Mega Strike", "damage": 25 + level * 5},  # Stronger attacks
+                {"name": "Regenerate", "heal": 30 + level * 3},     # Stronger healing
+                {"name": "Ultimate Attack", "damage": 50 + level * 8},  # Very strong
+                {"name": "Energy Shield", "heal": 20, "shield": True}   # Special shield ability
+            ]
+        else:
+            # Regular enemy
+            self.max_health = 100 + level * 50  # Regular health
+            self.health = self.max_health
+            self.mana = 50
+            self.abilities = [
+                {"name": "Attack", "damage": 10 + level * 2},
+                {"name": "Heal", "heal": 10},
+                {"name": "Special", "damage": 20 + level * 4}
+            ]
+
         self.poison = 0
-        self.abilities = [
-            {"name": "Attack", "damage": 10 + level * 2},
-            {"name": "Heal", "heal": 10},
-            {"name": "Special", "damage": 20 + level * 4}
-        ]
 
 selected_hero = None
 enemy = None
@@ -598,6 +700,17 @@ def draw_hero_selection():
     pygame.draw.rect(screen, BLACK, (bg_x, bg_y, bg_width, bg_height), 3)
     screen.blit(shop_prompt, (bg_x + 30, bg_y + 10))
 
+    # Current level indicator in top-right corner
+    level_text = small_font.render(f"Level {current_level}", True, BLACK)
+    level_bg_width = level_text.get_width() + 40
+    level_bg_height = level_text.get_height() + 10
+    level_bg = pygame.Surface((level_bg_width, level_bg_height))
+    level_bg.fill(WHITE)
+    level_bg.set_alpha(255)  # Fully opaque for visibility
+    screen.blit(level_bg, (SCREEN_WIDTH - level_bg_width - 10, 50))  # Position in top-right
+    pygame.draw.rect(screen, BLACK, (SCREEN_WIDTH - level_bg_width - 10, 50, level_bg_width, level_bg_height), 2)
+    screen.blit(level_text, (SCREEN_WIDTH - level_text.get_width() - 30, 55))
+
     global hero_buttons
     hero_buttons = []
     for i, hero in enumerate(HEROES):
@@ -641,10 +754,10 @@ def draw_win():
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
     subtitle = small_font.render(f"Level {current_level} Completed! +30 Coins. Total: {coins}", True, WHITE)
     screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
-    # Show current level and progress with visual indicators
-    level_display = f"LEVEL {current_level}/20"
+    # Show current level and progress with visual indicators - MOVED DOWN TO AVOID OVERLAP
+    level_display = f"LEVEL {current_level}/100"
     level_display_text = small_font.render(level_display, True, WHITE)
-    screen.blit(level_display_text, (SCREEN_WIDTH//2 - level_display_text.get_width()//2, 210))
+    screen.blit(level_display_text, (SCREEN_WIDTH//2 - level_display_text.get_width()//2, 245))  # Moved from 210 to 245
 
     # Progress bar showing level progression
     progress_width = 300
@@ -652,10 +765,10 @@ def draw_win():
     progress_x = SCREEN_WIDTH//2 - progress_width//2
     progress_y = 225
     pygame.draw.rect(screen, DARK_RED, (progress_x, progress_y, progress_width, progress_height))
-    filled_width = int(progress_width * (current_level / 20))
+    filled_width = int(progress_width * (current_level / 100))
     pygame.draw.rect(screen, GREEN, (progress_x, progress_y, filled_width, progress_height))
 
-    again = small_font.render("Press P for next level or Q to quit", True, WHITE)
+    again = small_font.render("Press P for next level or R for retry level or Q to quit", True, WHITE)
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 240))
 
 def draw_lose():
@@ -668,7 +781,7 @@ def draw_lose():
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
     subtitle = small_font.render("The enemy was too strong!", True, WHITE)
     screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
-    again = small_font.render("Press R to play again or Q to quit", True, WHITE)
+    again = small_font.render("Press R to retry level or Q to quit", True, WHITE)
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 250))
 
 def draw_final_win():
@@ -696,7 +809,7 @@ def draw_tie():
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
     subtitle = small_font.render(f"Mana depleted! +15 Coins. Total: {coins}", True, WHITE)
     screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
-    again = small_font.render("Press P for next level, R to retry or Q to quit", True, WHITE)
+    again = small_font.render("Press R to retry level or Q to quit", True, WHITE)
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 250))
 
 def draw_shop():
@@ -851,7 +964,7 @@ def draw_welcome():
         "- P: Next level after battle",
         "- Q: Quit game",
         "",
-        "Goal: Battle through 20 levels and defeat enemies!",
+    "Goal: Battle through 100 levels and defeat enemies!",
         "",
         "P key: Next level after victory/tie",
         "",
@@ -910,11 +1023,17 @@ def draw_battle():
         # Draw enemy info with glow effect
         for offset in range(3):
             glow_color = tuple(max(0, c - 50) for c in RED)
-            glow_text = font.render(f"Enemy HP: {enemy.health} Mana: {enemy.mana}", True, glow_color).convert_alpha()
+            if enemy.is_boss:
+                glow_text = font.render(f"{enemy.boss_name} HP: {enemy.health} Mana: {enemy.mana}", True, glow_color).convert_alpha()
+            else:
+                glow_text = font.render(f"Enemy HP: {enemy.health} Mana: {enemy.mana}", True, glow_color).convert_alpha()
             glow_text.set_alpha(100 - offset * 30)
             screen.blit(glow_text, (SCREEN_WIDTH//2 + 10 + offset, 10 + offset))
 
-        enemy_text = font.render(f"Enemy HP: {enemy.health} Mana: {enemy.mana}", True, RED)
+        if enemy.is_boss:
+            enemy_text = font.render(f"{enemy.boss_name} HP: {enemy.health} Mana: {enemy.mana}", True, (255, 215, 0))  # Gold for bosses
+        else:
+            enemy_text = font.render(f"Enemy HP: {enemy.health} Mana: {enemy.mana}", True, RED)
         screen.blit(enemy_text, (SCREEN_WIDTH//2 + 10, 10))
 
         # Draw abilities as BIG, HIGHLIGHTED buttons
@@ -1022,13 +1141,53 @@ def draw_battle():
         else:
             skip_button = None  # Clear skip button if can use abilities
 
-        # Ability box dimensions and positioning
-        box_width = 160
-        box_height = 80
-        button_y = SCREEN_HEIGHT - 90
+        # Ability box dimensions and positioning - ADJUST FOR NUMBER OF ABILITIES
+        total_abilities = len(selected_hero.abilities)
+        box_height = 90  # INCREASED height for all ability buttons to fit text better
+        if total_abilities <= 3:
+            # Standard 3-button layout
+            box_width = 180  # Slightly wider
+            start_x = 10
+            spacing = box_width + 10
+            button_y = SCREEN_HEIGHT - 100  # Higher up for more space
+        elif total_abilities == 4:
+            # Compact 4-button layout
+            box_width = 150  # Wider for text
+            start_x = 5
+            spacing = box_width + 5
+            button_y = SCREEN_HEIGHT - 100
+        elif total_abilities <= 6:
+            # 5-6 button layout - use two rows
+            box_width = 130  # Reasonable width
+            start_x = 5
+            spacing = box_width + 5
+            button_y = SCREEN_HEIGHT - 100  # Bottom row position
+            # Check if buttons would overflow - if so, limit to 6 and use two rows
+
+        else:
+            # Too many - limit to 6 abilities
+            max_abilities = 6
+            selected_hero.abilities = selected_hero.abilities[:6]
+            total_abilities = 6
+            box_width = 130
+            start_x = 5
+            spacing = box_width + 5
+            button_y = SCREEN_HEIGHT - 100
+
+        # If we're out of space, limit abilities
+        total_width_needed = start_x + (total_abilities * box_width) + ((total_abilities - 1) * (spacing - box_width))
+        if total_width_needed > SCREEN_WIDTH:
+            # Too wide - limit to fewer abilities or make smaller
+            while total_width_needed > SCREEN_WIDTH and total_abilities > 3:
+                total_abilities -= 1
+                selected_hero.abilities = selected_hero.abilities[:total_abilities]
+                total_width_needed = start_x + (total_abilities * box_width) + ((total_abilities - 1) * (spacing - box_width))
 
         for i, ability in enumerate(selected_hero.abilities):
-            x = 10 + i * (box_width + 10)  # Spacing between buttons
+            x = start_x + i * spacing  # Dynamic spacing based on number of abilities
+            # Ensure buttons don't go off screen
+            if x + box_width > SCREEN_WIDTH - 10:
+                x = SCREEN_WIDTH - box_width - 10
             y = button_y
 
             # Check if mouse is hovering over this ability
@@ -1086,30 +1245,57 @@ def draw_battle():
             name_text = text_font.render(ability_name, True, text_color)
             cost_text = text_font.render(f"{mana_cost} mana", True, text_color)
 
-            # Center text in button
-            total_width = max(name_text.get_width(), cost_text.get_width())
-            start_x = x + (box_width - total_width) // 2
-            start_y = y + box_height // 2 - (name_text.get_height() + cost_text.get_height() + 5) // 2
+            # FIX TEXT POSITIONING TO AVOID ANY OVERFLOW
+            # Limit name length to fit button width
+            max_name_width = box_width - 8
+            if name_text.get_width() > max_name_width:
+                # Truncate name if too long
+                truncated_name = ""
+                for char in ability_name:
+                    test_text = text_font.render(truncated_name + char, True, text_color)
+                    if test_text.get_width() > max_name_width:
+                        break
+                    truncated_name += char
+                ability_name = truncated_name
+                name_text = text_font.render(ability_name, True, text_color)
+
+            # Limit cost text length
+            max_cost_width = box_width - 8
+            if cost_text.get_width() > max_cost_width:
+                cost_text_str = f"{mana_cost}"  # Remove "mana" suffix to save space
+                cost_text = text_font.render(cost_text_str, True, text_color)
+
+            # PERFECTLY CENTER TEXT WITH SAFE MARGINS
+            # Calculate safe start positions with 4px margins from edges
+            center_x = x + box_width // 2
+            total_text_height = name_text.get_height() + cost_text.get_height()
+            center_y = y + box_height // 2
+
+            start_y = center_y - total_text_height // 2
+
+            # Center both texts horizontally with safe margins
+            safe_start_x_name = min(center_x - name_text.get_width() // 2, x + box_width - name_text.get_width() - 4)
+            safe_start_x_name = max(safe_start_x_name, x + 4)  # Ensure minimum left margin
+
+            safe_start_x_cost = min(center_x - cost_text.get_width() // 2, x + box_width - cost_text.get_width() - 4)
+            safe_start_x_cost = max(safe_start_x_cost, x + 4)  # Ensure minimum left margin
 
             # Draw name and cost with shadow/outline for better visibility
-            shadow_offset = 2
+            shadow_offset = 1  # Smaller shadow for better fit
             shadow_color = (0, 0, 0, 180)
 
-            # Text shadow/glow
-            for tx, ty in [(start_x - shadow_offset, start_y - shadow_offset),
-                          (start_x + shadow_offset, start_y - shadow_offset),
-                          (start_x - shadow_offset, start_y + shadow_offset),
-                          (start_x + shadow_offset, start_y + shadow_offset)]:
-                name_shadow = text_font.render(ability_name, True, shadow_color).convert_alpha()
-                name_shadow.set_alpha(128)
-                screen.blit(name_shadow, (tx, ty))
-                cost_shadow = text_font.render(f"{mana_cost} mana", True, shadow_color).convert_alpha()
-                cost_shadow.set_alpha(128)
-                screen.blit(cost_shadow, (tx, ty + name_text.get_height() + 5))
+            # Text shadow/glow - simplified for performance
+            name_shadow = text_font.render(ability_name, True, shadow_color).convert_alpha()
+            name_shadow.set_alpha(128)
+            screen.blit(name_shadow, (safe_start_x_name + shadow_offset, start_y + shadow_offset))
 
-            # Main text
-            screen.blit(name_text, (start_x, start_y))
-            screen.blit(cost_text, (start_x, start_y + name_text.get_height() + 5))
+            cost_shadow = text_font.render(cost_text_str if cost_text.get_width() > max_cost_width else f"{mana_cost} mana", True, shadow_color).convert_alpha()
+            cost_shadow.set_alpha(128)
+            screen.blit(cost_shadow, (safe_start_x_cost + shadow_offset, start_y + name_text.get_height() + shadow_offset))
+
+            # Main text - SAFE POSITIONED TO NEVER OVERFLOW
+            screen.blit(name_text, (safe_start_x_name, start_y))
+            screen.blit(cost_text, (safe_start_x_cost, start_y + name_text.get_height()))
 
             # Add special effects for certain abilities
             is_powerful = ability_name in ["Lightning", "Charge", "Rapid Fire"]
@@ -1215,45 +1401,49 @@ def draw_battle():
             border_color = RED + (border_alpha,)
             pygame.draw.rect(screen, border_color, (0, 0, SCREEN_WIDTH, SCREEN_HEIGHT), 5)
 
-        # Draw current level indicator
-        level_text = small_font.render(f"Level {current_level}", True, WHITE)
-        level_bg = pygame.Surface((level_text.get_width() + 20, level_text.get_height() + 10))
-        level_bg.fill(BLACK)
-        level_bg.set_alpha(128)
-        screen.blit(level_bg, (SCREEN_WIDTH - level_text.get_width() - 30, 20))
-        screen.blit(level_text, (SCREEN_WIDTH - level_text.get_width() - 25, 25))
+    # Draw current level indicator - positioned in bottom-center to avoid ALL overlap
+    level_text = small_font.render(f"LEVEL {current_level}", True, BLACK)
+    level_bg = pygame.Surface((level_text.get_width() + 40, level_text.get_height() + 16))
+    level_bg.fill(WHITE)
+    level_bg.set_alpha(220)  # Very opaque for perfect visibility
+    # Position in BOTTOM CENTER above ability buttons but not overlapping
+    center_x = SCREEN_WIDTH // 2 - level_text.get_width() // 2
+    bottom_y = SCREEN_HEIGHT - 140  # Above ability buttons but clear
+    screen.blit(level_bg, (center_x - 20, bottom_y - 8))
+    pygame.draw.rect(screen, BLACK, (center_x - 20, bottom_y - 8, level_text.get_width() + 40, level_text.get_height() + 16), 3)
+    screen.blit(level_text, (center_x, bottom_y))
 
-        # Health/Mana bars with glow effects
-        bar_y = hero_y + 35
-        # Hero health bar
-        total_health = 100 + player_extra_health
-        health_ratio = selected_hero.health / total_health
-        pygame.draw.rect(screen, RED, (10, bar_y, int(200 * health_ratio), 20))
-        pygame.draw.rect(screen, DARK_RED, (10, bar_y, 200, 20), 2)
-        # Glow for low health
-        if health_ratio < 0.3:
-            for offset in range(3):
-                glow_rect = pygame.Rect(10 - offset, bar_y - offset, int(200 * health_ratio) + offset * 2, 20 + offset * 2)
-                pygame.draw.rect(screen, RED, glow_rect, 1)
+    # Health/Mana bars with glow effects
+    bar_y = hero_y + 35
+    # Hero health bar
+    total_health = 100 + player_extra_health
+    health_ratio = selected_hero.health / total_health
+    pygame.draw.rect(screen, RED, (10, bar_y, int(200 * health_ratio), 20))
+    pygame.draw.rect(screen, DARK_RED, (10, bar_y, 200, 20), 2)
+    # Glow for low health
+    if health_ratio < 0.3:
+        for offset in range(3):
+            glow_rect = pygame.Rect(10 - offset, bar_y - offset, int(200 * health_ratio) + offset * 2, 20 + offset * 2)
+            pygame.draw.rect(screen, RED, glow_rect, 1)
 
-        # Hero mana bar
-        total_mana = 100 + player_extra_mana
-        mana_ratio = selected_hero.mana / total_mana
-        mana_y = bar_y + 25
-        pygame.draw.rect(screen, BLUE, (10, mana_y, int(200 * mana_ratio), 20))
-        pygame.draw.rect(screen, DARK_BLUE, (10, mana_y, 200, 20), 2)
+    # Hero mana bar
+    total_mana = 100 + player_extra_mana
+    mana_ratio = selected_hero.mana / total_mana
+    mana_y = bar_y + 25
+    pygame.draw.rect(screen, BLUE, (10, mana_y, int(200 * mana_ratio), 20))
+    pygame.draw.rect(screen, DARK_BLUE, (10, mana_y, 200, 20), 2)
 
-        # Enemy health bar (mirrored style)
-        enemy_bar_x = SCREEN_WIDTH - 210
-        enemy_health_ratio = enemy.health / enemy.max_health
-        pygame.draw.rect(screen, RED, (enemy_bar_x, 45, int(200 * enemy_health_ratio), 20))
-        pygame.draw.rect(screen, DARK_RED, (enemy_bar_x, 45, 200, 20), 2)
+    # Enemy health bar (mirrored style)
+    enemy_bar_x = SCREEN_WIDTH - 210
+    enemy_health_ratio = enemy.health / enemy.max_health
+    pygame.draw.rect(screen, RED, (enemy_bar_x, 45, int(200 * enemy_health_ratio), 20))
+    pygame.draw.rect(screen, DARK_RED, (enemy_bar_x, 45, 200, 20), 2)
 
-        # Enemy mana bar
-        enemy_mana_ratio = enemy.mana / 50
-        enemy_mana_y = 70
-        pygame.draw.rect(screen, BLUE, (enemy_bar_x, enemy_mana_y, int(200 * enemy_mana_ratio), 20))
-        pygame.draw.rect(screen, DARK_BLUE, (enemy_bar_x, enemy_mana_y, 200, 20), 2)
+    # Enemy mana bar
+    enemy_mana_ratio = enemy.mana / 50
+    enemy_mana_y = 70
+    pygame.draw.rect(screen, BLUE, (enemy_bar_x, enemy_mana_y, int(200 * enemy_mana_ratio), 20))
+    pygame.draw.rect(screen, DARK_BLUE, (enemy_bar_x, enemy_mana_y, 200, 20), 2)
 
 def create_particles(x, y, color, count=8, spread=50, speed=3):
     """Create particle effects for attacks/healing"""
@@ -1263,14 +1453,29 @@ def create_particles(x, y, color, count=8, spread=50, speed=3):
         particles.append(Particle(x + random.uniform(-spread, spread),
                                 y + random.uniform(-spread, spread), color, dx, dy))
 
-# Initialize global variables
-current_level = 1
-coins = 0
-player_extra_health = 0
-player_extra_mana = 0
-unlocked_abilities = {}
-bought_mercenaries = []
-shop_items = default_shop_items.copy()
+# Initialize global variables (FRESH START - ignore save file for level progression)
+current_level = 1  # Force fresh start at level 1
+coins = 0  # Reset coins to start fresh
+player_extra_health = 0  # Load from save - ALL UPGRADES NOW PERMANENT!
+player_extra_mana = 0  # Load from save - ALL UPGRADES NOW PERMANENT!
+player_extra_damage = 0  # Load from save - ALL UPGRADES NOW PERMANENT!
+unlocked_abilities = {}  # Reset unlocked abilities (but load from save)
+bought_mercenaries = []  # Reset mercenaries (but load from save)
+shop_items = default_shop_items.copy()  # Use fresh shop items
+
+# LOAD ALL PERMANENT UPGRADES FROM SAVE FILE FIRST (BEFORE GAME STARTS)
+if os.path.exists(SAVE_FILE):
+    try:
+        with open(SAVE_FILE, 'r') as f:
+            save_data = json.load(f)
+            player_extra_health = save_data.get('player_extra_health', 0)  # LOAD PERMANENT HEALTH!
+            player_extra_mana = save_data.get('player_extra_mana', 0)  # LOAD PERMANENT MANA!
+            player_extra_damage = save_data.get('player_extra_damage', 0)  # LOAD PERMANENT DAMAGE!
+    except Exception as e:
+        print(f"Error loading permanent upgrades: {e}")
+        player_extra_health = 0
+        player_extra_mana = 0
+        player_extra_damage = 0
 
 # Shop layout constants (must be global for hover detection)
 SHOP_ITEM_HEIGHT = 40
@@ -1280,8 +1485,8 @@ SHOP_ITEM_WIDTH = 600
 save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
 
 def refresh_shop_items():
-    """Check if shop needs to be refreshed for the new day"""
-    global shop_items
+    """Check if shop needs to be refreshed for the new day - PRESERVE PERMANENT PURCHASES"""
+    global shop_items, unlocked_abilities, bought_mercenaries, HEROES
     if os.path.exists(SAVE_FILE):
         with open(SAVE_FILE, 'r') as f:
             try:
@@ -1290,22 +1495,30 @@ def refresh_shop_items():
                 current_date = get_current_date()
 
                 if last_refresh != current_date or save_data.get('daily_shop_items') is None:
-                    # New day or no daily shop - generate new items
+                    # New day or no daily shop - generate new items BUT PRESERVE PERMANENT DATA
                     new_shop_items = get_daily_shop_items()
                     shop_items = new_shop_items
 
-                    # Update save with new date and items
+                    # Update save with new date and items, BUT DON'T OVERWRITE PERMANENT PURCHASES
                     save_data['last_daily_refresh'] = current_date
                     save_data['daily_shop_items'] = new_shop_items
                     save_data['shop_items'] = new_shop_items
 
+                    # Load permanent purchases from save (don't overwrite them)
+                    unlocked_abilities = save_data.get('unlocked_abilities', {})
+                    bought_mercenaries = save_data.get('bought_mercenaries', [])
+                    HEROES = save_data.get('heroes', [])
+
                     with open(SAVE_FILE, 'w') as w:
                         json.dump(save_data, w)
-                    print(f"Shop refreshed for {current_date}")
+                    print(f"Shop refreshed for {current_date} - Permanent purchases preserved")
                 else:
-                    # Load existing daily shop items
+                    # Load existing daily shop items AND permanent data
                     shop_items = save_data.get('daily_shop_items', default_shop_items.copy())
-                    print(f"Using existing shop for {current_date}")
+                    unlocked_abilities = save_data.get('unlocked_abilities', {})
+                    bought_mercenaries = save_data.get('bought_mercenaries', [])
+                    HEROES = save_data.get('heroes', [])
+                    print(f"Using existing shop for {current_date} - All saved data loaded")
             except Exception as e:
                 print(f"Error refreshing shop: {e}")
                 shop_items = get_daily_shop_items()
@@ -1313,7 +1526,7 @@ def refresh_shop_items():
         # No save file, generate new shop
         shop_items = get_daily_shop_items()
 
-        # Create initial save with daily shop
+        # Create initial save with daily shop - DON'T REINITIALIZE PERMANENT PURCHASES
         initial_save = {
             'current_level': current_level,
             'coins': coins,
@@ -1357,7 +1570,7 @@ def enemy_turn():
             ability = enemy.abilities[0]  # Attack is index 0
 
         if ability.get("name") == "Heal" and enemy.mana >= 5 and enemy.health < enemy.max_health:
-            enemy.mana -= 5
+            enemy.mana -= 5  # MANA DECREASING IS HERE!
             heal_amount = ability["heal"]
             enemy.health = min(enemy.health + heal_amount, enemy.max_health)
             damage_texts.append((small_font.render(f"Enemy healed {heal_amount}", True, BLUE), [600, 200], 60))
@@ -1383,7 +1596,7 @@ def enemy_turn():
                 pass  # Continue battle
 
 def purchase_item(index):
-    global coins, player_extra_health, player_extra_mana, unlocked_abilities, bought_mercenaries
+    global coins, player_extra_health, player_extra_mana, player_extra_damage, unlocked_abilities, bought_mercenaries
     item = shop_items[index]
     if not item["purchased"] and coins >= item["cost"]:
         coins -= item["cost"]
@@ -1393,14 +1606,21 @@ def purchase_item(index):
                 player_extra_health += item["amount"]
             elif item["stat"] == "mana":
                 player_extra_mana += item["amount"]
+            elif item["stat"] == "damage":
+                player_extra_damage += item["amount"]
         elif item["type"] == "ability":
             if item["hero"] not in unlocked_abilities:
                 unlocked_abilities[item["hero"]] = []
-            unlocked_abilities[item["hero"]].append(item["ability"])
+            # Stack NEWLY BOUGHT abilities at FRONT - newest on top/left
+            unlocked_abilities[item["hero"]].insert(0, item["ability"])
         elif item["type"] == "mercenary":
             bought_mercenaries.append(item)
         elif item["type"] == "new_hero":
             HEROES.append(item["hero"])
+        # Reset upgrades to keep them always available (except legendary items >= 1000 coins)
+        # Abilities and damage upgrades stay permanently purchased (out of stock)
+        if item["cost"] < 1000 and item["type"] == "upgrade" and item.get("stat", "") != "damage":
+            item["purchased"] = False
         save_game()  # 🎯 CRITICAL: Save game immediately after purchase!
 
 def reset_game():
@@ -1472,26 +1692,20 @@ while running:
                         coins += 30
                     elif game_state == TIE:
                         coins += 15
+                        # Stay in same level, don't change current_level
                     elif game_state == LOSE:
-                        current_level = 1
+                        # Stay in same level, don't reset to 1
+                        pass  # No level change
                     elif game_state == FINAL_WIN:
                         pass
                     reset_game()
-                    if current_level > 20:
+                    if current_level > 100:
                         game_state = FINAL_WIN
                     else:
                         game_state = SELECTION
                     # Reset save flags after restart
                     save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
-                elif event.key == pygame.K_p and game_state == TIE:
-                    # Allow P key in TIE state for progression (but no rewards in tie)
-                    current_level += 1
-                    reset_game()
-                    if current_level > 20:
-                        game_state = FINAL_WIN
-                    else:
-                        game_state = SELECTION
-                    save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
+
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = pygame.mouse.get_pos()
             if game_state == SELECTION:
@@ -1517,22 +1731,23 @@ while running:
                     for i, button in enumerate(ability_buttons):
                         if button.collidepoint(mouse_x, mouse_y):
                             ability = selected_hero.abilities[i]
+
+                            # Check if ability is LOCKED before allowing use
+                            is_powerful_ability = (ability["name"] in ["Lightning", "Charge", "Rapid Fire"])
+                            is_locked = is_powerful_ability and game_timer.player_turn_count < 3
+
+                            if is_locked:
+                                # Completely blocked - show message and prevent all ability logic
+                                damage_texts.append((small_font.render(f"{ability['name']} LOCKED! Available after turn 3", True, RED), [400, 300], 60))
+                                break  # Exit the loop to prevent any ability usage
+
                             mana_cost = ability.get("mana", 0)
                             if selected_hero.mana >= mana_cost:
                                 selected_hero.mana -= mana_cost
                                 game_timer.player_turn_count += 1
 
-                                # Check if player can use powerful abilities
-                                is_powerful_ability = (ability["name"] in ["Lightning", "Charge", "Rapid Fire"])
-
-                                # Prevent powerful abilities from being used in first 2 turns - completely locked
-                                if is_powerful_ability and game_timer.player_turn_count < 3:
-                                    # Cannot use powerful abilities yet - show message and continue without turn
-                                    damage_texts.append((small_font.render(f"{ability['name']} LOCKED! Available after turn 3", True, RED), [400, 300], 60))
-                                    continue  # Skip the ability, don't use turn
-
                                 if "damage" in ability:
-                                    damage = ability["damage"]
+                                    damage = ability["damage"] + player_extra_damage
                                     if ability.get("effect") == "poison":
                                         enemy.poison += 1
                                         damage_texts.append((small_font.render(f"{ability['name']}: -{damage} +Poison", True, GREEN), [600, 200], 60))
@@ -1542,7 +1757,7 @@ while running:
                                     animation_frames = 10
                                     animation_button = i
                                     if enemy.health <= 0:
-                                        if current_level >= 10:
+                                        if current_level >= 100:
                                             game_state = FINAL_WIN
                                             coins += 30
                                         else:
