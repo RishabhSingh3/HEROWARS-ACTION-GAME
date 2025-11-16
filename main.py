@@ -42,8 +42,205 @@ FINAL_WIN = 4
 SHOP = 5
 WELCOME = 6
 TIE = 7
+STORY_INTRO = 8
+SPECIAL_EVENT = 9
+ACHIEVEMENT = 10
 game_state = WELCOME
 DEBUG_MODE = False
+
+# Story Framework
+STORY_ACTS = {
+    "Act 1": {
+        "title": "The Awakening",
+        "description": "Heroes emerge to defend the kingdom from ancient darkness",
+        "start_level": 1,
+        "end_level": 25,
+        "narratives": [
+            "The ancient crystals have awakened. Evil forces stir in the shadows...",
+            "The first test approaches. Will you rise to defend your people?",
+            "Mysterious artifacts begin to appear as you grow stronger..."
+        ]
+    },
+    "Act 2": {
+        "title": "The Gathering Storm",
+        "description": "Dark legions assemble as champions face their true challenges",
+        "start_level": 26,
+        "end_level": 50,
+        "narratives": [
+            "The darkness grows bolder. Heroes must unite against inconceivable odds...",
+            "Legends speak of a cataclysm approaching. Your battles now shape destiny...",
+            "Forbidden magics and ancient weapons come within reach..."
+        ]
+    },
+    "Act 3": {
+        "title": "Eclipse of Heroes",
+        "description": "Final confrontation with darkness in the ultimate battle",
+        "start_level": 51,
+        "end_level": 100,
+        "narratives": [
+            "The final eclipse draws near. All powers must converge...",
+            "Prophecies foretold of this moment. The fate of all rests in your hands...",
+            "Ultimate power awaits the worthy. Let the saga reach its epic conclusion..."
+        ]
+    }
+}
+
+# Battle Events System
+BATTLE_EVENTS = {
+    "ENEMY_SOUNDTRACK": {
+        "name": "Enemy Anthem",
+        "description": "Battle theme intensifies - enemy gains 20% damage boost!",
+        "effects": {"enemy_damage": 1.2},
+        "rarity": 0.15
+    },
+    "MANA_STORM": {
+        "name": "Mana Storm",
+        "description": "Magical energies surge - all abilities cost 50% more mana!",
+        "effects": {"mana_cost": 1.5},
+        "rarity": 0.10
+    },
+    "CRITICAL_MOMENT": {
+        "name": "Critical Moment",
+        "description": "Fates align - critical hits now deal 50% more damage!",
+        "effects": {"critical_mult": 1.5},
+        "rarity": 0.12
+    },
+    "POWER_SURGE": {
+        "name": "Power Surge",
+        "description": "Ancient energies erupt - all heroes gain +15% damage!",
+        "effects": {"player_damage": 1.15},
+        "rarity": 0.08
+    },
+    "SHIELD_OF_LIGHT": {
+        "name": "Shield of Light",
+        "description": "Divine protection - enemy damage reduced by 25%!",
+        "effects": {"damage_reduction": 0.75},
+        "rarity": 0.10
+    }
+}
+
+# Achievement System
+ACHIEVEMENTS = {
+    "FIRST_VICTORY": {"name": "First Steps", "description": "Win your first battle", "reward": 10, "unlocked": False},
+    "SPEED_DEMON": {"name": "Speed Demon", "description": "Win a battle in 5 turns or less", "reward": 25, "unlocked": False},
+    "PERFECTIONIST": {"name": "Perfectionist", "description": "Win without taking damage", "reward": 50, "unlocked": False},
+    "BEAT_BOSS": {"name": "Boss Slayer", "description": "Defeat your first boss enemy", "reward": 75, "unlocked": False},
+    "SPENDER": {"name": "Shopaholic", "description": "Spend 1000 coins in the shop", "reward": 100, "unlocked": False},
+    "HIGH_ROLLER": {"name": "High Roller", "description": "Reach 500 coins total", "reward": 150, "unlocked": False},
+    "LEGEND": {"name": "Legend", "description": "Complete the entire 100 levels campaign", "reward": 500, "unlocked": False}
+}
+
+achievement_progress = {}  # Track achievement progress like total spending
+
+# Current Battle Modifiers
+# Boss Dialogue System - Overconfident Boss Messages
+BOSS_DIALOGUE = [
+    "You pathetic worm! Your time ends here!",
+    "Your flesh will make a wonderful decoration!",
+    "I've killed thousands stronger than you!",
+    "Your blood will paint these walls red!",
+    "Beg for mercy before I crush your skull!",
+    "No one survives my wrath!",
+    "Your puny skills are amusing... for a moment!",
+    "Feel the power of true evil!",
+    "Your screams will echo in my throne room!",
+    "You should've stayed home, little hero!",
+    "I'll tear your heart out while you watch!",
+    "Your fear feeds my power!",
+    "Fall to your knees and maybe I'll end it quickly!",
+    "I am darkness incarnate!",
+    "Your hero's journey ends in agony!"
+]
+
+last_boss_dialogue_time = 0
+BOSS_DIALOGUE_INTERVAL = 8000  # Show boss dialogue every 8 seconds
+
+# Battle event variables
+current_battle_event = None
+battle_modifier = {}
+
+def get_current_act():
+    """Determine current story act based on level"""
+    if current_level <= 25:
+        return "Act 1"
+    elif current_level <= 50:
+        return "Act 2"
+    else:
+        return "Act 3"
+
+def get_random_story_narrative():
+    """Get a random narrative from the current act"""
+    act = get_current_act()
+    narratives = STORY_ACTS[act]["narratives"]
+    return random.choice(narratives)
+
+def should_trigger_event():
+    """Determine if a battle event should trigger"""
+    return random.random() < 0.25  # 25% chance
+
+def trigger_random_event():
+    """Select and apply a random battle event"""
+    global current_battle_event, battle_modifier
+    event_name = random.choice(list(BATTLE_EVENTS.keys()))
+    current_battle_event = BATTLE_EVENTS[event_name]
+
+    # Initialize battle modifier based on event
+    battle_modifier = current_battle_event["effects"].copy()
+
+    # Show event notification
+    event_title = font.render(f"EVENT: {current_battle_event['name']}", True, YELLOW)
+    screen.blit(event_title, (SCREEN_WIDTH//2 - event_title.get_width()//2, 200))
+
+    event_desc = small_font.render(current_battle_event["description"], True, WHITE)
+    screen.blit(event_desc, (SCREEN_WIDTH//2 - event_desc.get_width()//2, 240))
+
+    pygame.display.flip()
+
+    # Show for 2 seconds, then resume
+    pygame.time.wait(2000)
+
+    return current_battle_event
+
+def check_achievements():
+    """Check for unlocked achievements"""
+    unlocked_achievement = None
+
+    # First Victory
+    if not ACHIEVEMENTS["FIRST_VICTORY"]["unlocked"] and current_level > 1:
+        unlocked_achievement = "FIRST_VICTORY"
+
+    # Speed Demon (placeholder - would need turn tracking in battles)
+    if not ACHIEVEMENTS["SPEED_DEMON"]["unlocked"] and game_timer.player_turn_count <= 5 and selected_hero and selected_hero.health == (100 + player_extra_health):
+        # Would need better tracking for this
+        pass
+
+    # Perfectionist
+    if not ACHIEVEMENTS["PERFECTIONIST"]["unlocked"] and selected_hero and selected_hero.health == (100 + player_extra_health) and enemy.health == 0:
+        unlocked_achievement = "PERFECTIONIST"
+
+    # Boss Slayer
+    if not ACHIEVEMENTS["BEAT_BOSS"]["unlocked"] and enemy and enemy.is_boss and enemy.health == 0:
+        unlocked_achievement = "BEAT_BOSS"
+
+    # Spender
+    total_spent = int(achievement_progress.get("total_spent", 0))
+    if not ACHIEVEMENTS["SPENDER"]["unlocked"] and total_spent >= 1000:
+        unlocked_achievement = "SPENDER"
+
+    # High Roller
+    if not ACHIEVEMENTS["HIGH_ROLLER"]["unlocked"] and coins >= 500:
+        unlocked_achievement = "HIGH_ROLLER"
+
+    # Legend
+    if not ACHIEVEMENTS["LEGEND"]["unlocked"] and current_level >= 100:
+        unlocked_achievement = "LEGEND"
+
+    # Unlock the achievement if found
+    if unlocked_achievement:
+        ACHIEVEMENTS[unlocked_achievement]["unlocked"] = True
+        return ACHIEVEMENTS[unlocked_achievement]
+
+    return None
 
 SAVE_FILE = 'game_save.json'
 
@@ -253,21 +450,18 @@ def load_game():
                 bought_mercenaries = save_data.get('bought_mercenaries', [])
                 shop_items[:] = save_data.get('shop_items', [])
                 HEROES[:] = save_data.get('heroes', [])
-                print(f"Upgrades loaded - Permanent stats preserved!")
+                # Silent load - no print messages
             except Exception as e:
-                print(f"Failed to load save: {e}")
+                # Silent error handling
                 return
 
             # Calculate permanent purchase costs
             permanent_cost = calculate_permanent_purchase_cost()
 
-            # FORCE FRESH START LEVEL - OVERRIDE SAVED LEVEL
-            current_level = 1
-
             # Subtract permanent purchase costs from saved coins
             coins = max(0, saved_coins - permanent_cost)
 
-            print(f"Fresh Start: Level {current_level}, Coins: {coins} (deducted {permanent_cost} for permanent purchases)")
+            # Silent load - no print messages
 
 def save_game():
     save_data = {
@@ -291,6 +485,33 @@ def save_game():
         f.close() if 'f' in locals() and not f.closed else None
 
 # Default data
+# Scary Boss Names Pool
+SCARY_BOSS_NAMES = [
+    "Shadow Beast", "Dark Sorcerer", "Blood Lord", "Fiery Phoenix", "Ice Titan",
+    "Death Knight", "Void Walker", "Crimson Demon", "Necrotic Overlord", "Chaos Bringer",
+    "Soul Eater", "Abyss Terror", "Nightmare King", "Plague Master", "Wrath Incarnate",
+    "Grim Reaper", "Corruption Lord", "Doomsday Harbinger", "Forsaken Emperor", "Apocalypse Beast"
+]
+
+# Boss Dialogue System - Overconfident Boss Messages
+BOSS_DIALOGUE = [
+    "You pathetic worm! Your time ends here!",
+    "Your flesh will make a wonderful decoration!",
+    "I've killed thousands stronger than you!",
+    "Your blood will paint these walls red!",
+    "Beg for mercy before I crush your skull!",
+    "No one survives my wrath!",
+    "Your puny skills are amusing... for a moment!",
+    "Feel the power of true evil!",
+    "Your screams will echo in my throne room!",
+    "You should've stayed home, little hero!",
+    "I'll tear your heart out while you watch!",
+    "Your fear feeds my power!",
+    "Fall to your knees and maybe I'll end it quickly!",
+    "I am darkness incarnate!",
+    "Your hero's journey ends in agony!"
+]
+
 default_shop_items = [
     {"name": "Upgrade Health (+10)", "cost": 20, "purchased": False, "type": "upgrade", "stat": "health", "amount": 10},
     {"name": "Upgrade Mana (+10)", "cost": 25, "purchased": False, "type": "upgrade", "stat": "mana", "amount": 10},
@@ -387,11 +608,15 @@ class Enemy:
         self.boss_name = ""
 
         if self.is_boss:
-            # Boss enemy with much stronger stats
+            # Boss enemy with much stronger stats and SCARY NAMES!
             self.max_health = 200 + level * 100  # 4x health
             self.health = self.max_health
             self.mana = 150  # 3x mana
-            self.boss_name = f"BOSS - Level {level}"
+            if level == 100:
+                self.boss_name = "CREATOR - Level 100"
+            else:
+                # Use random SCARY boss name instead of generic "BOSS"
+                self.boss_name = random.choice(SCARY_BOSS_NAMES) + f" - Level {level}"
             self.abilities = [
                 {"name": "Mega Strike", "damage": 25 + level * 5},  # Stronger attacks
                 {"name": "Regenerate", "heal": 30 + level * 3},     # Stronger healing
@@ -745,37 +970,100 @@ def draw_hero_selection():
             pygame.draw.circle(screen, tuple(hero["color"]) + (150 - p*40,), (p_x, p_y), 2)
 
 def draw_win():
+    global current_battle_event, transition_start_time
     if not save_flags['win']:
         play_background_music('win')
         save_game()
         save_flags['win'] = True
+        # Clear battle event effects
+        current_battle_event = None
+        battle_modifier.clear()
+        transition_start_time = pygame.time.get_ticks()
+
     screen.fill(BLACK)
+
+    current_time = pygame.time.get_ticks()
+    time_since_transition = current_time - transition_start_time
+
+    # Add achievement check here visually
+    unlocked_achievement = check_achievements()
+    if unlocked_achievement and not unlocked_achievement["unlocked"]:
+        # Don't mark as unlocked here - let the win screen transition handle it
+        achievement_y = 120
+
     title = font.render("Victory!", True, GREEN)
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
-    subtitle = small_font.render(f"Level {current_level} Completed! +30 Coins. Total: {coins}", True, WHITE)
-    screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, 200))
-    # Show current level and progress with visual indicators - MOVED DOWN TO AVOID OVERLAP
-    level_display = f"LEVEL {current_level}/100"
-    level_display_text = small_font.render(level_display, True, WHITE)
-    screen.blit(level_display_text, (SCREEN_WIDTH//2 - level_display_text.get_width()//2, 245))  # Moved from 210 to 245
 
-    # Progress bar showing level progression
-    progress_width = 300
-    progress_height = 10
-    progress_x = SCREEN_WIDTH//2 - progress_width//2
-    progress_y = 225
-    pygame.draw.rect(screen, DARK_RED, (progress_x, progress_y, progress_width, progress_height))
-    filled_width = int(progress_width * (current_level / 100))
-    pygame.draw.rect(screen, GREEN, (progress_x, progress_y, filled_width, progress_height))
+    # Enhanced win display with boss bonuses
+    story_y = 180
+    if enemy.is_boss:
+        boss_bonus_display = ""
+        if old_level == 50:
+            boss_bonus_display = "+1000 COIN BOSS BONUS!"
+        elif old_level == 100:
+            boss_bonus_display = "+10000 CREATOR BONUS! You are LEGENDARY!"
+        else:
+            boss_bonus_display = "+100 COIN BOSS BONUS!"
 
-    again = small_font.render("Press P for next level or R for retry level or Q to quit", True, WHITE)
-    screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 240))
+        bonus_text = font.render(boss_bonus_display, True, YELLOW)
+        screen.blit(bonus_text, (SCREEN_WIDTH//2 - bonus_text.get_width()//2, story_y))
+        story_y += 30
+
+    # Story display logic - show one line at a time with delays
+    story_text = get_random_story_narrative()
+    story_lines = [story_text[i:i+50] for i in range(0, len(story_text), 50)]  # Split into lines
+    story_y_original = story_y
+    story_y = story_y_original
+
+    # Calculate which line to show and when
+    LINE_DISPLAY_DELAY = 2000  # 2 seconds per line
+    for line_idx, line in enumerate(story_lines):
+        line_appearance_time = line_idx * LINE_DISPLAY_DELAY
+        if time_since_transition >= line_appearance_time:
+            story_render = small_font.render(line, True, YELLOW)
+            screen.blit(story_render, (SCREEN_WIDTH//2 - story_render.get_width()//2, story_y))
+            story_y += 20
+
+    # Wait for ALL story lines to be displayed before showing other elements
+    story_display_time = len(story_lines) * LINE_DISPLAY_DELAY
+    if time_since_transition >= story_display_time:
+        subtitle = small_font.render(f"Level {current_level} Completed! +30 Coins. Total: {coins}", True, WHITE)
+        screen.blit(subtitle, (SCREEN_WIDTH//2 - subtitle.get_width()//2, story_y + 10))
+
+        # Show current level and progress with visual indicators
+        level_display = f"LEVEL {current_level}/100"
+        level_display_text = small_font.render(level_display, True, WHITE)
+        screen.blit(level_display_text, (SCREEN_WIDTH//2 - level_display_text.get_width()//2, story_y + 50))
+
+        # Progress bar showing level progression
+        progress_width = 300
+        progress_height = 10
+        progress_x = SCREEN_WIDTH//2 - progress_width//2
+        progress_y = story_y + 80
+        pygame.draw.rect(screen, DARK_RED, (progress_x, progress_y, progress_width, progress_height))
+        filled_width = int(progress_width * (current_level / 100))
+        pygame.draw.rect(screen, GREEN, (progress_x, progress_y, filled_width, progress_height))
+
+        # Show battle event if it occurred
+        if current_battle_event:
+            event_text = small_font.render(f"Event: {current_battle_event['name']}", True, BLUE)
+            screen.blit(event_text, (SCREEN_WIDTH//2 - event_text.get_width()//2, story_y + 100))
+
+        # Instructions
+        again = small_font.render("Press P for next level or R for retry level or Q to quit", True, WHITE)
+        screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, story_y + 150))
+    else:
+        # Show "Reading story..." message while story is displaying
+        reading_text = small_font.render("Reading the chronicles of your epic victory...", True, YELLOW)
+        screen.blit(reading_text, (SCREEN_WIDTH//2 - reading_text.get_width()//2, story_y + 10))
 
 def draw_lose():
+    global transition_start_time
     if not save_flags['lose']:
         play_background_music('lose')
         save_game()
         save_flags['lose'] = True
+        transition_start_time = pygame.time.get_ticks()
     screen.fill(BLACK)
     title = font.render("Defeat", True, RED)
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
@@ -785,10 +1073,12 @@ def draw_lose():
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 250))
 
 def draw_final_win():
+    global transition_start_time
     if not save_flags['final_win']:
         play_background_music('win')
         save_game()
         save_flags['final_win'] = True
+        transition_start_time = pygame.time.get_ticks()
     screen.fill(BLACK)
     title = font.render("All Levels Completed!", True, GREEN)
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
@@ -800,10 +1090,12 @@ def draw_final_win():
     screen.blit(again, (SCREEN_WIDTH//2 - again.get_width()//2, 280))
 
 def draw_tie():
+    global transition_start_time
     if not save_flags['tie']:
         play_background_music('lose')
         save_game()
         save_flags['tie'] = True
+        transition_start_time = pygame.time.get_ticks()
     screen.fill(BLACK)
     title = font.render("Tie!", True, YELLOW)
     screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 150))
@@ -952,37 +1244,65 @@ def draw_shop():
 
 def draw_welcome():
     screen.fill(BLACK)
-    title = font.render("Hero Battle Game", True, WHITE)
-    screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 100))
+
+    # Game title with pulsing effect
+    pulse_factor = 1.0 + 0.1 * abs(math.sin(current_time * 0.003))
+    title = font.render("HERO BATTLE GAME", True, WHITE)
+    title_pulse = pygame.transform.smoothscale(title, (int(title.get_width() * pulse_factor), int(title.get_height() * pulse_factor)))
+    screen.blit(title_pulse, (SCREEN_WIDTH//2 - title_pulse.get_width()//2, 100))
+
+    # Show current act if in campaign
+    if current_level > 1:
+        act = get_current_act()
+        act_text = small_font.render(f"Currently in {STORY_ACTS[act]['title']}", True, YELLOW)
+        screen.blit(act_text, (SCREEN_WIDTH//2 - act_text.get_width()//2, 150))
 
     instructions = [
-        "Controls:",
-        "- Mouse: Click to select heroes and use abilities",
-        "- S: Open shop to buy upgrades",
-        "- B: Go back from shop",
-        "- R: Restart after battle/end game",
-        "- P: Next level after battle",
-        "- Q: Quit game",
+        "EPIC FANTASY RPG BATTLE SYSTEM!",
         "",
-    "Goal: Battle through 100 levels and defeat enemies!",
+        "✨ NEW FEATURES ADDED:",
+        "• Multi-act story campaign with unique narratives",
+        "• Random battle events that change each fight",
+        "• Achievement system with coin rewards",
+        "• Diverse hero roster and powerful abilities",
+        "• Daily rotating shop with legendary items",
         "",
-        "P key: Next level after victory/tie",
+        "🎮 CONTROLS:",
+        "• Mouse: Select heroes and cast abilities",
+        "• S: Open epic shop for upgrades",
+        "• B: Return from shop to hero selection",
+        "• R: Restart battle/level",
+        "• P: Progress to next level (after victory)",
+        "• Q: Quit game",
         "",
-        "Press any key to start"
+        "🎯 GOAL: Complete all 100 levels and become a LEGEND!",
+        "",
+        "Press any key to begin your epic journey..."
     ]
 
     y = 180
     for line in instructions:
         if line == "":
-            y += 30
-        elif line.startswith("- ") or line.startswith("Controls:") or line.startswith("Goal:"):
+            y += 20
+        elif "NEW FEATURES" in line or "CONTROLS:" in line or "GOAL:" in line:
             text = small_font.render(line, True, GREEN)
             screen.blit(text, (SCREEN_WIDTH//2 - text.get_width()//2, y))
-            y += 25
+            y += 22
+        elif any(char in line for char in ["✨", "🎮", "🎯"]):
+            text = small_font.render(line, True, YELLOW)
+            screen.blit(text, (SCREEN_WIDTH//2 - text.get_width()//2, y))
+            y += 20
         else:
             text = small_font.render(line, True, WHITE)
             screen.blit(text, (SCREEN_WIDTH//2 - text.get_width()//2, y))
-            y += 25
+            y += 18
+
+    # Add floating particles for atmosphere
+    for i in range(10):
+        particle_x = int(SCREEN_WIDTH * abs(math.sin(current_time * 0.001 + i)) % SCREEN_WIDTH)
+        particle_y = int(SCREEN_HEIGHT * abs(math.cos(current_time * 0.0008 + i * 0.5)) % SCREEN_HEIGHT)
+        particle_size = 1 + int(math.sin(current_time * 0.002 + i) * 0.5)
+        pygame.draw.circle(screen, WHITE + (20,), (particle_x, particle_y), particle_size)
 
 def draw_battle():
     global animation_frames, damage_text_counter, hue_shift, screen_shake
@@ -1031,7 +1351,10 @@ def draw_battle():
             screen.blit(glow_text, (SCREEN_WIDTH//2 + 10 + offset, 10 + offset))
 
         if enemy.is_boss:
-            enemy_text = font.render(f"{enemy.boss_name} HP: {enemy.health} Mana: {enemy.mana}", True, (255, 215, 0))  # Gold for bosses
+            if "CREATOR" in enemy.boss_name or enemy.boss_name == "BOSS - Level 100":
+                enemy_text = font.render(f"CREATOR HP: {enemy.health} Mana: {enemy.mana}", True, (255, 0, 255))  # Magenta for Creator
+            else:
+                enemy_text = font.render(f"{enemy.boss_name} HP: {enemy.health} Mana: {enemy.mana}", True, (255, 215, 0))  # Gold for bosses
         else:
             enemy_text = font.render(f"Enemy HP: {enemy.health} Mana: {enemy.mana}", True, RED)
         screen.blit(enemy_text, (SCREEN_WIDTH//2 + 10, 10))
@@ -1141,59 +1464,45 @@ def draw_battle():
         else:
             skip_button = None  # Clear skip button if can use abilities
 
-        # Ability box dimensions and positioning - ADJUST FOR NUMBER OF ABILITIES
+        # Ability box dimensions and positioning - SUPPORT TWO ROWS FOR MANY ABILITIES
         total_abilities = len(selected_hero.abilities)
-        box_height = 90  # INCREASED height for all ability buttons to fit text better
-        if total_abilities <= 3:
-            # Standard 3-button layout
-            box_width = 180  # Slightly wider
-            start_x = 10
-            spacing = box_width + 10
-            button_y = SCREEN_HEIGHT - 100  # Higher up for more space
-        elif total_abilities == 4:
-            # Compact 4-button layout
-            box_width = 150  # Wider for text
-            start_x = 5
-            spacing = box_width + 5
-            button_y = SCREEN_HEIGHT - 100
-        elif total_abilities <= 6:
-            # 5-6 button layout - use two rows
-            box_width = 130  # Reasonable width
-            start_x = 5
-            spacing = box_width + 5
-            button_y = SCREEN_HEIGHT - 100  # Bottom row position
-            # Check if buttons would overflow - if so, limit to 6 and use two rows
-
+        if total_abilities > 4:  # Use two rows if more than 4 abilities
+            rows = 2
+            abilities_per_row = (total_abilities + rows - 1) // rows  # Ceiling division
         else:
-            # Too many - limit to 6 abilities
-            max_abilities = 6
-            selected_hero.abilities = selected_hero.abilities[:6]
-            total_abilities = 6
-            box_width = 130
-            start_x = 5
-            spacing = box_width + 5
-            button_y = SCREEN_HEIGHT - 100
+            rows = 1
+            abilities_per_row = total_abilities
 
-        # If we're out of space, limit abilities
-        total_width_needed = start_x + (total_abilities * box_width) + ((total_abilities - 1) * (spacing - box_width))
-        if total_width_needed > SCREEN_WIDTH:
-            # Too wide - limit to fewer abilities or make smaller
-            while total_width_needed > SCREEN_WIDTH and total_abilities > 3:
-                total_abilities -= 1
-                selected_hero.abilities = selected_hero.abilities[:total_abilities]
-                total_width_needed = start_x + (total_abilities * box_width) + ((total_abilities - 1) * (spacing - box_width))
+        box_height = 70  # Smaller for potential two rows
+        box_width = 150  # Standard width
+        spacing = 10
+        start_y = SCREEN_HEIGHT - 110  # Start position for bottom row
 
-        for i, ability in enumerate(selected_hero.abilities):
-            x = start_x + i * spacing  # Dynamic spacing based on number of abilities
-            # Ensure buttons don't go off screen
-            if x + box_width > SCREEN_WIDTH - 10:
-                x = SCREEN_WIDTH - box_width - 10
-            y = button_y
+        for row in range(rows):
+            start_index = row * abilities_per_row
+            end_index = min((row + 1) * abilities_per_row, total_abilities)
+            abilities_in_row = selected_hero.abilities[start_index:end_index]
+            num_in_row = len(abilities_in_row)
+
+            row_y = start_y - row * (box_height + spacing)
+
+            # Center the row horizontally
+            total_width = num_in_row * box_width + (num_in_row - 1) * spacing
+            start_x_row = (SCREEN_WIDTH - total_width) // 2
+
+            for local_i, ability in enumerate(abilities_in_row):
+                x = start_x_row + local_i * (box_width + spacing)
+                button_rect = pygame.Rect(x, row_y, box_width, box_height)
+                ability_buttons.append(button_rect)
+
+        # Draw ability buttons
+        for i, button in enumerate(ability_buttons):
+            ability = selected_hero.abilities[i]
+
+            x, y, box_width_d, box_height_d = button.x, button.y, button.width, button.height
 
             # Check if mouse is hovering over this ability
-            button_rect = pygame.Rect(x, y, box_width, box_height)
-            ability_buttons.append(button_rect)
-            is_hovering = button_rect.collidepoint(mouse_x, mouse_y)
+            is_hovering = button.collidepoint(mouse_x, mouse_y)
 
             # Dynamic colors based on state
             has_mana = selected_hero.mana >= ability.get("mana", 0)
@@ -1215,24 +1524,24 @@ def draw_battle():
 
             # Pulsing background effect
             bg_color = tuple(min(255, int(c * pulse_factor)) for c in bg_base)
-            bg_surface = pygame.Surface((box_width, box_height))
+            bg_surface = pygame.Surface((box_width_d, box_height_d))
             bg_surface.fill(bg_color)
             bg_surface.set_alpha(200)
 
             # Draw background with glow layers
             for glow_offset in range(5):
                 glow_rect = pygame.Rect(x - glow_offset, y - glow_offset,
-                                      box_width + glow_offset * 2, box_height + glow_offset * 2)
+                                      box_width_d + glow_offset * 2, box_height_d + glow_offset * 2)
                 glow_color_alpha = bg_color + (50 - glow_offset * 10,)
                 pygame.draw.rect(screen, glow_color_alpha, glow_rect, border_radius=8)
 
             # Main button background
-            pygame.draw.rect(screen, bg_color, button_rect, border_radius=8)
+            pygame.draw.rect(screen, bg_color, button, border_radius=8)
 
             # Border highlight
             border_thickness = 4 if is_hovering else 2
             border_color = YELLOW if is_hovering and has_mana else WHITE
-            pygame.draw.rect(screen, border_color, button_rect, border_thickness, border_radius=8)
+            pygame.draw.rect(screen, border_color, button, border_thickness, border_radius=8)
 
             # Large, colorful ability text
             text_font = pygame.font.SysFont(None, 32) if is_hovering else font
@@ -1241,43 +1550,23 @@ def draw_battle():
 
             text_color = WHITE if is_hovering else (YELLOW if has_mana else DARK_RED)
 
-            # Split text into name and cost for better layout
+            # Split text into name and cost
             name_text = text_font.render(ability_name, True, text_color)
             cost_text = text_font.render(f"{mana_cost} mana", True, text_color)
 
-            # FIX TEXT POSITIONING TO AVOID ANY OVERFLOW
-            # Limit name length to fit button width
-            max_name_width = box_width - 8
-            if name_text.get_width() > max_name_width:
-                # Truncate name if too long
-                truncated_name = ""
-                for char in ability_name:
-                    test_text = text_font.render(truncated_name + char, True, text_color)
-                    if test_text.get_width() > max_name_width:
-                        break
-                    truncated_name += char
-                ability_name = truncated_name
-                name_text = text_font.render(ability_name, True, text_color)
-
-            # Limit cost text length
-            max_cost_width = box_width - 8
-            if cost_text.get_width() > max_cost_width:
-                cost_text_str = f"{mana_cost}"  # Remove "mana" suffix to save space
-                cost_text = text_font.render(cost_text_str, True, text_color)
-
             # PERFECTLY CENTER TEXT WITH SAFE MARGINS
             # Calculate safe start positions with 4px margins from edges
-            center_x = x + box_width // 2
+            center_x = x + box_width_d // 2
             total_text_height = name_text.get_height() + cost_text.get_height()
-            center_y = y + box_height // 2
+            center_y = y + box_height_d // 2
 
             start_y = center_y - total_text_height // 2
 
             # Center both texts horizontally with safe margins
-            safe_start_x_name = min(center_x - name_text.get_width() // 2, x + box_width - name_text.get_width() - 4)
+            safe_start_x_name = min(center_x - name_text.get_width() // 2, x + box_width_d - name_text.get_width() - 4)
             safe_start_x_name = max(safe_start_x_name, x + 4)  # Ensure minimum left margin
 
-            safe_start_x_cost = min(center_x - cost_text.get_width() // 2, x + box_width - cost_text.get_width() - 4)
+            safe_start_x_cost = min(center_x - cost_text.get_width() // 2, x + box_width_d - cost_text.get_width() - 4)
             safe_start_x_cost = max(safe_start_x_cost, x + 4)  # Ensure minimum left margin
 
             # Draw name and cost with shadow/outline for better visibility
@@ -1289,7 +1578,7 @@ def draw_battle():
             name_shadow.set_alpha(128)
             screen.blit(name_shadow, (safe_start_x_name + shadow_offset, start_y + shadow_offset))
 
-            cost_shadow = text_font.render(cost_text_str if cost_text.get_width() > max_cost_width else f"{mana_cost} mana", True, shadow_color).convert_alpha()
+            cost_shadow = text_font.render(f"{mana_cost} mana", True, shadow_color).convert_alpha()
             cost_shadow.set_alpha(128)
             screen.blit(cost_shadow, (safe_start_x_cost + shadow_offset, start_y + name_text.get_height() + shadow_offset))
 
@@ -1304,12 +1593,12 @@ def draw_battle():
             if is_powerful and is_early_ability:
                 # Lock icon for powerful abilities in early turns
                 lock_text = text_font.render("LOCKED", True, RED)
-                lock_x = x + box_width//2 - lock_text.get_width()//2
-                lock_y = y + box_height - lock_text.get_height() - 5
+                lock_x = x + box_width_d//2 - lock_text.get_width()//2
+                lock_y = y + box_height_d - lock_text.get_height() - 5
                 screen.blit(lock_text, (lock_x, lock_y))
 
                 # Dim the button when locked
-                locked_overlay = pygame.Surface((box_width, box_height))
+                locked_overlay = pygame.Surface((box_width_d, box_height_d))
                 locked_overlay.fill((0, 0, 0))
                 locked_overlay.set_alpha(100)
                 screen.blit(locked_overlay, (x, y))
@@ -1406,12 +1695,12 @@ def draw_battle():
     level_bg = pygame.Surface((level_text.get_width() + 40, level_text.get_height() + 16))
     level_bg.fill(WHITE)
     level_bg.set_alpha(220)  # Very opaque for perfect visibility
-    # Position in BOTTOM CENTER above ability buttons but not overlapping
+    # Position above ability buttons - adjust based on number of rows
     center_x = SCREEN_WIDTH // 2 - level_text.get_width() // 2
-    bottom_y = SCREEN_HEIGHT - 140  # Above ability buttons but clear
-    screen.blit(level_bg, (center_x - 20, bottom_y - 8))
-    pygame.draw.rect(screen, BLACK, (center_x - 20, bottom_y - 8, level_text.get_width() + 40, level_text.get_height() + 16), 3)
-    screen.blit(level_text, (center_x, bottom_y))
+    level_text_y = start_y - rows * (box_height + spacing) - 30  # Well above all ability rows
+    screen.blit(level_bg, (center_x - 20, level_text_y - 8))
+    pygame.draw.rect(screen, BLACK, (center_x - 20, level_text_y - 8, level_text.get_width() + 40, level_text.get_height() + 16), 3)
+    screen.blit(level_text, (center_x, level_text_y))
 
     # Health/Mana bars with glow effects
     bar_y = hero_y + 35
@@ -1456,6 +1745,7 @@ def create_particles(x, y, color, count=8, spread=50, speed=3):
 # Initialize global variables (FRESH START - ignore save file for level progression)
 current_level = 1  # Force fresh start at level 1
 coins = 0  # Reset coins to start fresh
+old_level = 0  # Track previous level for boss bonus calculations
 player_extra_health = 0  # Load from save - ALL UPGRADES NOW PERMANENT!
 player_extra_mana = 0  # Load from save - ALL UPGRADES NOW PERMANENT!
 player_extra_damage = 0  # Load from save - ALL UPGRADES NOW PERMANENT!
@@ -1519,6 +1809,36 @@ def refresh_shop_items():
                     bought_mercenaries = save_data.get('bought_mercenaries', [])
                     HEROES = save_data.get('heroes', [])
                     print(f"Using existing shop for {current_date} - All saved data loaded")
+
+                # Filter out already owned items from shop_items
+                filtered_shop_items = []
+                for item in shop_items:
+                    should_include = True
+
+                    if item["type"] == "ability":
+                        # Check if this ability is already unlocked for any hero
+                        hero_name = item["hero"]
+                        ability_name = item["ability"]["name"]
+                        if hero_name in unlocked_abilities and any(a["name"] == ability_name for a in unlocked_abilities[hero_name]):
+                            should_include = False
+
+                    elif item["type"] == "new_hero":
+                        # Check if this hero is already unlocked
+                        hero_name = item["hero"]["name"]
+                        if any(h["name"] == hero_name for h in HEROES):
+                            should_include = False
+
+                    elif item["type"] == "mercenary":
+                        # Check if mercenary already bought by name and type (mercenaries are one-time)
+                        mercenary_name = item["name"]
+                        if any(m["name"] == mercenary_name for m in bought_mercenaries):
+                            should_include = False
+
+                    # For upgrades and other types, keep them (they can be bought multiple times)
+                    if should_include:
+                        filtered_shop_items.append(item)
+
+                shop_items = filtered_shop_items
             except Exception as e:
                 print(f"Error refreshing shop: {e}")
                 shop_items = get_daily_shop_items()
@@ -1618,8 +1938,8 @@ def purchase_item(index):
         elif item["type"] == "new_hero":
             HEROES.append(item["hero"])
         # Reset upgrades to keep them always available (except legendary items >= 1000 coins)
-        # Abilities and damage upgrades stay permanently purchased (out of stock)
-        if item["cost"] < 1000 and item["type"] == "upgrade" and item.get("stat", "") != "damage":
+        # Abilities stay permanently purchased (out of stock)
+        if item["cost"] < 1000 and item["type"] == "upgrade":
             item["purchased"] = False
         save_game()  # 🎯 CRITICAL: Save game immediately after purchase!
 
@@ -1673,13 +1993,48 @@ while running:
                     game_state = SELECTION
             elif game_state == WIN and event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_p:
+                    # Store current level before incrementing
+                    old_level = current_level
+
+                    # Calculate boss bonus coins
+                    boss_bonus = 0
+                    if old_level % 5 == 0:  # Was a boss fight
+                        if old_level == 50:
+                            boss_bonus = 1000  # Level 50 boss
+                        elif old_level == 100:
+                            boss_bonus = 10000  # Level 100 Creator boss
+                        else:
+                            boss_bonus = 100  # Regular boss
+
+                    # Increment level counter
                     current_level += 1
-                    coins += 30
-                    reset_game()
-                    if current_level > 20:
-                        game_state = FINAL_WIN
+                    coins += 30 + boss_bonus  # Regular 30 + boss bonus
+
+                    # Check for act transitions FIRST (before achievements)
+                    should_show_story = False
+                    if current_level == 26:  # Just reached Act 2 start
+                        should_show_story = True
+                    elif current_level == 51:  # Just reached Act 3 start
+                        should_show_story = True
+
+                    # Check for new achievements AFTER level increment
+                    unlocked_achievement = check_achievements()
+
+                    if should_show_story:
+                        game_state = STORY_INTRO
+                    elif unlocked_achievement:
+                        game_state = ACHIEVEMENT
                     else:
-                        game_state = SELECTION
+                        # Trigger battle event occasionally
+                        if should_trigger_event():
+                            trigger_random_event()
+
+                        reset_game()
+                        if current_level > 100:
+                            game_state = FINAL_WIN
+                        else:
+                            game_state = SELECTION
+
                     # Reset save flags after restart
                     save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
                 elif event.key == pygame.K_r:
@@ -1705,6 +2060,16 @@ while running:
                         game_state = SELECTION
                     # Reset save flags after restart
                     save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
+            elif game_state in [STORY_INTRO, ACHIEVEMENT] and event.type == pygame.KEYDOWN:
+                # Advance from story intro or achievement screen to next battle
+                if should_trigger_event():
+                    trigger_random_event()
+                reset_game()
+                if current_level > 100:
+                    game_state = FINAL_WIN
+                else:
+                    game_state = SELECTION
+                save_flags = {'win': False, 'lose': False, 'tie': False, 'final_win': False}
 
         elif event.type == pygame.MOUSEBUTTONDOWN:
             mouse_x, mouse_y = pygame.mouse.get_pos()
@@ -1802,6 +2167,13 @@ while running:
                 game_timer.last_enemy_turn = current_time
                 game_timer.waiting_for_enemy_turn = False
 
+    # Boss dialogue system - show overconfident dialogue periodically
+    if game_state == BATTLE and enemy is not None and enemy.is_boss and current_time - last_boss_dialogue_time > BOSS_DIALOGUE_INTERVAL:
+        if enemy.health > enemy.max_health * 0.3:  # Only taunt if boss has >30% health
+            boss_line = random.choice(BOSS_DIALOGUE)
+            damage_texts.append((small_font.render(f"{enemy.boss_name}: {boss_line}", True, (255, 100, 100)), [SCREEN_WIDTH//2, SCREEN_HEIGHT//2], 120))
+            last_boss_dialogue_time = current_time
+
     # Handle mouse hover for cursor change
     mouse_x, mouse_y = pygame.mouse.get_pos()
     hovering = False
@@ -1837,6 +2209,9 @@ while running:
     elif game_state == SELECTION:
         draw_hero_selection()
     elif game_state == BATTLE:
+        # Check for battle events at start of combat
+        if should_trigger_event() and not current_battle_event:
+            trigger_random_event()
         draw_battle()
     elif game_state == WIN:
         draw_win()
@@ -1846,6 +2221,51 @@ while running:
         draw_final_win()
     elif game_state == TIE:
         draw_tie()
+    elif game_state == STORY_INTRO:
+        # Simple story narrative display
+        screen.fill(BLACK)
+        current_act = get_current_act()
+        act_title = font.render(STORY_ACTS[current_act]["title"], True, YELLOW)
+        screen.blit(act_title, (SCREEN_WIDTH//2 - act_title.get_width()//2, 100))
+
+        description = small_font.render(STORY_ACTS[current_act]["description"], True, WHITE)
+        screen.blit(description, (SCREEN_WIDTH//2 - description.get_width()//2, 150))
+
+        narrative = get_random_story_narrative()
+        story_lines = [narrative[i:i+60] for i in range(0, len(narrative), 60)]
+        y_pos = 200
+        for line in story_lines:
+            line_text = small_font.render(line, True, WHITE)
+            screen.blit(line_text, (SCREEN_WIDTH//2 - line_text.get_width()//2, y_pos))
+            y_pos += 25
+
+        next_act_text = small_font.render("Press any key to continue your journey...", True, GREEN)
+        screen.blit(next_act_text, (SCREEN_WIDTH//2 - next_act_text.get_width()//2, y_pos + 30))
+
+        pygame.display.flip()
+
+    elif game_state == ACHIEVEMENT:
+        # Achievement unlocked screen
+        screen.fill(BLACK)
+        achievement_title = font.render("ACHIEVEMENT UNLOCKED!", True, YELLOW)
+        screen.blit(achievement_title, (SCREEN_WIDTH//2 - achievement_title.get_width()//2, 100))
+
+        if unlocked_achievement:
+            name_text = font.render(unlocked_achievement["name"], True, YELLOW)
+            screen.blit(name_text, (SCREEN_WIDTH//2 - name_text.get_width()//2, 150))
+
+            desc_text = small_font.render(unlocked_achievement["description"], True, WHITE)
+            screen.blit(desc_text, (SCREEN_WIDTH//2 - desc_text.get_width()//2, 200))
+
+            coins_earned = unlocked_achievement["reward"]
+            reward_text = small_font.render(f"Coins earned: {coins_earned}", True, GREEN)
+            screen.blit(reward_text, (SCREEN_WIDTH//2 - reward_text.get_width()//2, 250))
+
+            continue_text = small_font.render("Press any key to continue...", True, BLUE)
+            screen.blit(continue_text, (SCREEN_WIDTH//2 - continue_text.get_width()//2, 300))
+
+            pygame.display.flip()
+
     elif game_state == SHOP:
         draw_shop()
 
